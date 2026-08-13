@@ -59,6 +59,7 @@ Os dados iniciais de professores, disciplinas, usuários e avaliações serão f
 - [Visão do produto](docs/vision.md)
 - [Escopo](docs/scope.md)
 - [Roadmap](docs/roadmap.md)
+- [ADR 0001 — Stack inicial](docs/decisions/0001-stack-inicial.md)
 - [Orientações para agentes de desenvolvimento](AGENTS.md)
 
 ## Execução local
