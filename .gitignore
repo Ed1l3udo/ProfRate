@@ -1,0 +1,36 @@
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Test and coverage artifacts
+coverage/
+.coverage/
+test-results/
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Dependencies and caches
+node_modules/
+__pycache__/
+*.py[cod]
+.cache/
+.tmp/
+temp/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+
+# Operating systems
+.DS_Store
+Thumbs.db
+desktop.ini
