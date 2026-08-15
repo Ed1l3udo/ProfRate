@@ -10,7 +10,8 @@
     "test": "vitest run",
     "db:check": "node --env-file=../../.env --import tsx src/db/check-connection.ts",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts"
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:seed": "node --env-file=../../.env --import tsx src/db/seed.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
