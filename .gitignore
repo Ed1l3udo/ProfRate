@@ -16,6 +16,9 @@ test-results/
 build/
 dist/
 out/
+*.tsbuildinfo
+apps/web/vite.config.js
+apps/web/vite.config.d.ts
 
 # Dependencies and caches
 node_modules/
