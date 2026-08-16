@@ -1,58 +1,122 @@
 # ProfRate
 
-ProfRate é um projeto pessoal, educacional e de portfólio para explorar a construção incremental de uma plataforma de consulta e avaliação de professores e disciplinas.
+ProfRate é um projeto pessoal, educacional e de portfólio para aprender backend, banco de dados, APIs e testes automatizados por meio de uma aplicação de consulta de professores fictícios.
 
-O produto planejado inclui API, banco de dados, frontend web, aplicativo mobile, autenticação, avaliações, moderação, testes, integração contínua e deploy. O foco principal de aprendizado está no backend, na modelagem e persistência de dados, na arquitetura da API e em testes automatizados.
+## Estado atual
 
-## Estado do projeto
+A primeira fatia vertical da P0 está concluída para demonstração local:
 
-O projeto está em sua fase inicial de documentação e definição de escopo. A stack tecnológica ainda não foi escolhida; essa decisão será tomada de forma justificada durante a P0.
+```text
+PostgreSQL → Drizzle → Express → API → Vite/React
+```
 
-Ainda não há aplicação implementada, dependências instaladas ou ambiente de execução configurado.
+O projeto não possui serviço público. Ele não recebe avaliações reais, não utiliza dados de pessoas ou instituições reais e não deve ser apresentado como plataforma pública.
 
-## Objetivos de aprendizado
+## Origem, transparência e dados
 
-- Projetar uma API com responsabilidades e contratos claros.
-- Modelar e evoluir um banco de dados de forma consciente.
-- Compreender autenticação, autorização e segurança de aplicações.
-- Desenvolver testes unitários, de integração e de ponta a ponta.
-- Integrar clientes web e mobile à mesma API.
-- Praticar CI, deploy e evolução incremental de arquitetura.
-- Registrar decisões técnicas e suas consequências.
+A ideia do projeto foi inspirada no **ProfRate**, um trabalho acadêmico originalmente desenvolvido em grupo. Esta é uma reimplementação pessoal, criada do zero, com histórico Git, decisões técnicas e código próprios. Nenhum código do projeto acadêmico original foi reutilizado.
 
-## Funcionalidades planejadas
+O ProfRate não é afiliado, mantido nem representa a Universidade Federal do Ceará (UFC).
 
-- Consulta de professores e disciplinas.
-- Cadastro, edição e exclusão de avaliações.
-- Cálculo de médias e aplicação de filtros.
-- Autenticação e autorização de usuários.
-- Denúncias e moderação de conteúdo.
-- Experiências web responsiva e mobile.
-- Documentação da API, testes automatizados e deploy.
+Os professores atuais — Ada Ribeiro, Caio Nogueira e Lina Vasconcelos — são fictícios. Todos os dados usados nas demonstrações locais devem permanecer fictícios.
 
-As prioridades e a ordem de implementação estão descritas em [docs/roadmap.md](docs/roadmap.md).
+## Arquitetura atual
 
-## Origem e transparência
+- **Banco:** PostgreSQL 18 no Docker Compose, com volume local persistente.
+- **Persistência:** Drizzle ORM, schema TypeScript e migrations SQL versionadas.
+- **API:** Node.js 24, TypeScript e Express 5 em `apps/api`.
+- **Frontend:** React e Vite em `apps/web`.
+- **Integração local:** o proxy do Vite encaminha `/api/professors` para `GET /professors` da API local.
+- **Testes:** Vitest e Supertest na API; Vitest e React Testing Library no frontend.
 
-A ideia deste projeto surgiu do **ProfRate**, um projeto acadêmico originalmente desenvolvido em grupo.
+## Pré-requisitos
 
-Repositório do projeto acadêmico original:
-https://github.com/JulianoMRA/ProfRate
+- Node.js 24
+- pnpm 11
+- Docker Desktop com Docker Compose
 
-Esta é uma implementação individual nova, criada do zero, com novo histórico Git, novas decisões técnicas e deploy próprio. Nenhum código do projeto acadêmico original será copiado.
+## Execução local
 
-Este é um projeto educacional e de portfólio, sem vínculo, representação ou caráter oficial junto à Universidade Federal do Ceará (UFC).
+Instale as dependências:
 
-Os dados iniciais de professores, disciplinas, usuários e avaliações serão fictícios. Eles não representarão pessoas reais nem informações institucionais oficiais.
+```sh
+pnpm install --frozen-lockfile
+```
 
-## Princípios de desenvolvimento
+Crie a configuração local a partir do exemplo:
 
-- Evoluir por pequenas fatias verticais, revisáveis e testáveis.
-- Compreender as decisões importantes antes de implementar grandes mudanças.
-- Documentar escolhas de arquitetura e seus impactos.
-- Proteger privacidade, segurança e integridade das pessoas.
-- Tratar avaliações e moderação com responsabilidade.
-- Manter todo o código desta implementação original.
+```powershell
+# PowerShell
+Copy-Item .env.example .env
+```
+
+```sh
+# macOS/Linux
+cp .env.example .env
+```
+
+Defina em `.env` uma senha local para `POSTGRES_PASSWORD` e use a mesma senha em `DATABASE_URL`.
+
+Inicie o PostgreSQL:
+
+```sh
+docker compose up -d
+docker compose ps
+```
+
+Antes de continuar, aguarde o serviço `postgres` aparecer como saudável (`healthy`) em `docker compose ps`. Só então aplique a migration e o seed:
+
+```sh
+pnpm --filter @profrate/api db:migrate
+pnpm --filter @profrate/api db:seed
+pnpm --filter @profrate/api db:check
+```
+
+Mantenha estes dois processos ativos em terminais separados:
+
+```sh
+# Terminal da API
+pnpm --filter @profrate/api dev
+```
+
+```sh
+# Terminal do frontend
+pnpm --filter @profrate/web dev
+```
+
+Abra a interface em [http://localhost:5173](http://localhost:5173). A API fica disponível em `http://localhost:3000`.
+
+Para encerrar o banco local, execute:
+
+```sh
+docker compose down
+```
+
+Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker compose down -v` para a rotina normal, pois ele remove volumes.
+
+## Banco de dados
+
+- `db:migrate` aplica as migrations SQL geradas pelo Drizzle.
+- `db:seed` insere os três professores fictícios somente quando a tabela está vazia.
+- `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
+
+## API
+
+| Método | Caminho | Resposta |
+| --- | --- | --- |
+| GET | `/health` | `{ "status": "ok" }` |
+| GET | `/professors` | Lista de professores fictícios com `id` e `name` |
+
+## Verificações
+
+```sh
+pnpm --filter @profrate/api typecheck
+pnpm --filter @profrate/api test
+pnpm --filter @profrate/api build
+pnpm --filter @profrate/web typecheck
+pnpm --filter @profrate/web test
+pnpm --filter @profrate/web build
+```
 
 ## Documentação
 
@@ -61,10 +125,6 @@ Os dados iniciais de professores, disciplinas, usuários e avaliações serão f
 - [Roadmap](docs/roadmap.md)
 - [ADR 0001 — Stack inicial](docs/decisions/0001-stack-inicial.md)
 - [Orientações para agentes de desenvolvimento](AGENTS.md)
-
-## Execução local
-
-As instruções de execução serão adicionadas depois da escolha e configuração da stack na P0.
 
 ## Licença
 

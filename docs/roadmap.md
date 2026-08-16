@@ -6,7 +6,7 @@ O desenvolvimento será incremental e orientado por fatias verticais. Cada fase 
 
 ### Objetivo
 
-Estabelecer as bases do projeto e publicar um fluxo mínimo completo: dados fictícios de professores persistidos no banco, expostos por uma API e exibidos em uma página web.
+Estabelecer as bases do projeto e demonstrar localmente um fluxo mínimo completo: dados fictícios de professores persistidos no banco, expostos por uma API e exibidos em uma página web.
 
 ### Entregas
 
@@ -17,11 +17,15 @@ Estabelecer as bases do projeto e publicar um fluxo mínimo completo: dados fict
 - Endpoint para listar professores.
 - Página web consumindo esse endpoint.
 - Testes essenciais da primeira fatia vertical.
-- Primeiro deploy de demonstração.
+- Demonstração local documentada.
 
 ### Critério de conclusão
 
-Uma pessoa deve conseguir acessar a demonstração publicada e visualizar, pela página web, uma lista de professores fictícios obtida da API e persistida no banco. As decisões principais e o caminho crítico devem estar documentados e testados.
+Uma pessoa com os pré-requisitos deve conseguir iniciar o PostgreSQL, a API e o frontend localmente e visualizar, pela página web, uma lista de professores fictícios obtida da API e persistida no banco. As decisões principais e o caminho crítico devem estar documentados e testados.
+
+### Decisão sobre deploy
+
+O deploy público foi adiado deliberadamente nesta etapa. O projeto permanece como demonstração local, sem operação pública, sem recebimento de avaliações reais e usando somente dados fictícios. A decisão evita custos e manutenção de infraestrutura enquanto o foco é aprendizado e portfólio.
 
 ## P1 — Produto web principal
 
