@@ -8,6 +8,7 @@ describe("GET /health", () => {
     const app = createApp({
       findProfessorById: async () => undefined,
       listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
     });
     const response = await request(app).get("/health");
 

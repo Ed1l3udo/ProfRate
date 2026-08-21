@@ -1,0 +1,17 @@
+import { asc, eq } from "drizzle-orm";
+
+import { db } from "../../db/client.js";
+import { reviews } from "../../db/schema.js";
+
+export async function listReviewsByProfessorId(professorId: number) {
+  return db
+    .select({
+      id: reviews.id,
+      professorId: reviews.professorId,
+      rating: reviews.rating,
+      comment: reviews.comment,
+    })
+    .from(reviews)
+    .where(eq(reviews.professorId, professorId))
+    .orderBy(asc(reviews.id));
+}
