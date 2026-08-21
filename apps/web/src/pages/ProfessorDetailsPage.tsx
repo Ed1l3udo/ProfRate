@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
+import { ProfessorReviews } from "../components/ProfessorReviews.js";
 import type { ProfessorDetails } from "../types/professor.js";
 
 type LoadState = "loading" | "success" | "not-found" | "invalid-id" | "error";
@@ -78,6 +79,7 @@ export function ProfessorDetailsPage() {
       <main>
         <h1>{professor.name}</h1>
         <p>Departamento: {professor.department}</p>
+        <ProfessorReviews professorId={professor.id} />
         <Link to="/">Voltar para a lista</Link>
       </main>
     );
