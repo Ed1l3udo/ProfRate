@@ -15,3 +15,25 @@ export async function listReviewsByProfessorId(professorId: number) {
     .where(eq(reviews.professorId, professorId))
     .orderBy(asc(reviews.id));
 }
+
+export async function createReview({
+  professorId,
+  rating,
+  comment,
+}: {
+  professorId: number;
+  rating: number;
+  comment: string;
+}) {
+  const [review] = await db
+    .insert(reviews)
+    .values({ professorId, rating, comment })
+    .returning({
+      id: reviews.id,
+      professorId: reviews.professorId,
+      rating: reviews.rating,
+      comment: reviews.comment,
+    });
+
+  return review;
+}

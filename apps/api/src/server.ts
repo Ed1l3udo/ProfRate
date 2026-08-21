@@ -3,10 +3,14 @@ import {
   findProfessorById,
   listProfessors,
 } from "./modules/professors/repository.js";
-import { listReviewsByProfessorId } from "./modules/reviews/repository.js";
+import {
+  createReview,
+  listReviewsByProfessorId,
+} from "./modules/reviews/repository.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const app = createApp({
+  createReview,
   findProfessorById,
   listProfessors,
   listReviewsByProfessorId,

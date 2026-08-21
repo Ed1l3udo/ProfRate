@@ -3,6 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/app.js";
 
+const testReview = {
+  id: 0,
+  professorId: 0,
+  rating: 1,
+  comment: "",
+};
+
 describe("GET /professors", () => {
   it("returns the professors provided by the repository", async () => {
     const professors = [
@@ -12,6 +19,7 @@ describe("GET /professors", () => {
     ];
     const listProfessors = vi.fn().mockResolvedValue(professors);
     const app = createApp({
+      createReview: async () => testReview,
       findProfessorById: async () => undefined,
       listProfessors,
       listReviewsByProfessorId: async () => [],
@@ -34,6 +42,7 @@ describe("GET /professors/:id", () => {
     };
     const findProfessorById = vi.fn().mockResolvedValue(professor);
     const app = createApp({
+      createReview: async () => testReview,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -50,6 +59,7 @@ describe("GET /professors/:id", () => {
   it("returns 404 when a valid professor id does not exist", async () => {
     const findProfessorById = vi.fn().mockResolvedValue(undefined);
     const app = createApp({
+      createReview: async () => testReview,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -73,6 +83,7 @@ describe("GET /professors/:id", () => {
     async (id) => {
       const findProfessorById = vi.fn();
       const app = createApp({
+        createReview: async () => testReview,
         findProfessorById,
         listProfessors: async () => [],
         listReviewsByProfessorId: async () => [],
@@ -115,6 +126,7 @@ describe("GET /professors/:id/reviews", () => {
     });
     const listReviewsByProfessorId = vi.fn().mockResolvedValue(reviews);
     const app = createApp({
+      createReview: async () => testReview,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId,
@@ -138,6 +150,7 @@ describe("GET /professors/:id/reviews", () => {
     });
     const listReviewsByProfessorId = vi.fn().mockResolvedValue([]);
     const app = createApp({
+      createReview: async () => testReview,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId,
@@ -155,6 +168,7 @@ describe("GET /professors/:id/reviews", () => {
     const findProfessorById = vi.fn().mockResolvedValue(undefined);
     const listReviewsByProfessorId = vi.fn();
     const app = createApp({
+      createReview: async () => testReview,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId,
@@ -180,6 +194,7 @@ describe("GET /professors/:id/reviews", () => {
       const findProfessorById = vi.fn();
       const listReviewsByProfessorId = vi.fn();
       const app = createApp({
+        createReview: async () => testReview,
         findProfessorById,
         listProfessors: async () => [],
         listReviewsByProfessorId,
@@ -198,4 +213,159 @@ describe("GET /professors/:id/reviews", () => {
       expect(listReviewsByProfessorId).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("POST /professors/:id/reviews", () => {
+  it("creates a review with a converted id and trimmed comment", async () => {
+    const createdReview = {
+      id: 4,
+      professorId: 1,
+      rating: 5,
+      comment: "Explicações muito claras.",
+    };
+    const findProfessorById = vi.fn().mockResolvedValue({
+      id: 1,
+      name: "Ada Ribeiro",
+      department: "Departamento Aurora",
+    });
+    const createReview = vi.fn().mockResolvedValue(createdReview);
+    const app = createApp({
+      createReview,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app).post("/professors/1/reviews").send({
+      rating: 5,
+      comment: "  Explicações muito claras.  ",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toStrictEqual(createdReview);
+    expect(findProfessorById).toHaveBeenCalledOnce();
+    expect(findProfessorById).toHaveBeenCalledWith(1);
+    expect(createReview).toHaveBeenCalledOnce();
+    expect(createReview).toHaveBeenCalledWith({
+      professorId: 1,
+      rating: 5,
+      comment: "Explicações muito claras.",
+    });
+  });
+
+  it("returns 404 without creating a review when the professor does not exist", async () => {
+    const findProfessorById = vi.fn().mockResolvedValue(undefined);
+    const createReview = vi.fn();
+    const app = createApp({
+      createReview,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app).post("/professors/999999/reviews").send({
+      rating: 5,
+      comment: "Explicações muito claras.",
+    });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toStrictEqual({
+      error: {
+        code: "PROFESSOR_NOT_FOUND",
+        message: "Professor not found.",
+      },
+    });
+    expect(findProfessorById).toHaveBeenCalledWith(999999);
+    expect(createReview).not.toHaveBeenCalled();
+  });
+
+  it.each(["abc", "0", "-1", "1.5", "1e3", "01", "2147483648"])(
+    "returns 400 without querying repositories for invalid id %s",
+    async (id) => {
+      const findProfessorById = vi.fn();
+      const createReview = vi.fn();
+      const app = createApp({
+        createReview,
+        findProfessorById,
+        listProfessors: async () => [],
+        listReviewsByProfessorId: async () => [],
+      });
+
+      const response = await request(app).post(`/professors/${id}/reviews`).send({
+        rating: 5,
+        comment: "Explicações muito claras.",
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toStrictEqual({
+        error: {
+          code: "INVALID_PROFESSOR_ID",
+          message: "Professor id must be a positive integer.",
+        },
+      });
+      expect(findProfessorById).not.toHaveBeenCalled();
+      expect(createReview).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["rating 0", { rating: 0, comment: "Comentário válido." }],
+    ["rating 6", { rating: 6, comment: "Comentário válido." }],
+    ["decimal rating", { rating: 1.5, comment: "Comentário válido." }],
+    ["string rating", { rating: "5", comment: "Comentário válido." }],
+    ["missing rating", { comment: "Comentário válido." }],
+    ["empty comment", { rating: 5, comment: "" }],
+    ["blank comment", { rating: 5, comment: "   " }],
+    ["non-text comment", { rating: 5, comment: 123 }],
+    ["missing comment", { rating: 5 }],
+    ["extra property", { rating: 5, comment: "Comentário válido.", extra: true }],
+  ])("returns 400 without querying repositories for %s", async (_name, body) => {
+    const findProfessorById = vi.fn();
+    const createReview = vi.fn();
+    const app = createApp({
+      createReview,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app).post("/professors/1/reviews").send(body);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toStrictEqual({
+      error: {
+        code: "INVALID_REVIEW_INPUT",
+        message:
+          "Review body must include an integer rating from 1 to 5 and a non-empty comment.",
+      },
+    });
+    expect(findProfessorById).not.toHaveBeenCalled();
+    expect(createReview).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for malformed JSON without querying repositories", async () => {
+    const findProfessorById = vi.fn();
+    const createReview = vi.fn();
+    const app = createApp({
+      createReview,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app)
+      .post("/professors/1/reviews")
+      .set("Content-Type", "application/json")
+      .send('{"rating": 5, "comment":');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toStrictEqual({
+      error: {
+        code: "INVALID_JSON_BODY",
+        message: "Request body must be valid JSON.",
+      },
+    });
+    expect(findProfessorById).not.toHaveBeenCalled();
+    expect(createReview).not.toHaveBeenCalled();
+  });
 });
