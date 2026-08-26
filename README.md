@@ -1,13 +1,29 @@
 # ProfRate
 
-ProfRate é um projeto pessoal, educacional e de portfólio para aprender backend, banco de dados, APIs e testes automatizados por meio de uma aplicação de consulta de professores fictícios.
+ProfRate é um projeto pessoal, educacional e de portfólio para estudar backend, banco de dados, APIs e testes automatizados por meio de uma aplicação local com professores e avaliações fictícios.
+
+## Objetivo de aprendizagem
+
+O projeto exercita, em fatias pequenas, a integração entre persistência relacional, API HTTP, validação de entrada, frontend React e testes. Todos os nomes, departamentos, comentários e demais dados atuais são fictícios.
+
+## Funcionalidades implementadas
+
+- listagem de professores fictícios;
+- detalhes de um professor;
+- listagem de avaliações fictícias;
+- criação local de avaliações fictícias;
+- validação de parâmetros e corpos de requisição com respostas de erro previsíveis;
+- persistência em PostgreSQL por migrations e seed repetível;
+- interface web com estados de carregamento, sucesso, vazio e erro.
+
+O projeto não é uma plataforma pública e não recebe avaliações reais.
 
 ## Estado atual
 
-A primeira fatia vertical da P0 está concluída para demonstração local:
+A fatia vertical da P0 está concluída para demonstração local:
 
 ```text
-PostgreSQL → Drizzle → Express → API → Vite/React
+React/Vite ↔ API Express ↔ Drizzle ORM ↔ PostgreSQL
 ```
 
 O projeto não possui serviço público. Ele não recebe avaliações reais, não utiliza dados de pessoas ou instituições reais e não deve ser apresentado como plataforma pública.
@@ -23,10 +39,11 @@ Os professores atuais — Ada Ribeiro, Caio Nogueira e Lina Vasconcelos — são
 ## Arquitetura atual
 
 - **Banco:** PostgreSQL 18 no Docker Compose, com volume local persistente.
-- **Persistência:** Drizzle ORM, schema TypeScript e migrations SQL versionadas.
+- **Persistência:** Drizzle ORM, Drizzle Kit, schema TypeScript e migrations SQL versionadas.
 - **API:** Node.js 24, TypeScript e Express 5 em `apps/api`.
-- **Frontend:** React e Vite em `apps/web`.
-- **Integração local:** o proxy do Vite encaminha `/api/professors` para `GET /professors` da API local.
+- **Frontend:** React, React Router e Vite em `apps/web`.
+- **Validação:** Zod nas fronteiras de entrada da API.
+- **Integração local:** o proxy do Vite encaminha os caminhos `/api` para a API local, removendo esse prefixo.
 - **Testes:** Vitest e Supertest na API; Vitest e React Testing Library no frontend.
 
 ## Pré-requisitos
@@ -97,8 +114,13 @@ Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker comp
 ## Banco de dados
 
 - `db:migrate` aplica as migrations SQL geradas pelo Drizzle.
-- `db:seed` insere os três professores fictícios somente quando a tabela está vazia.
+- `db:seed` insere os três professores e as três avaliações fictícias conhecidas, sem duplicar esses dados controlados quando executado novamente.
 - `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
+- `db:generate` gera uma nova migration depois de uma alteração aprovada no schema Drizzle.
+
+```sh
+pnpm --filter @profrate/api db:generate
+```
 
 ## API
 
@@ -106,6 +128,11 @@ Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker comp
 | --- | --- | --- |
 | GET | `/health` | `{ "status": "ok" }` |
 | GET | `/professors` | Lista de professores fictícios com `id` e `name` |
+| GET | `/professors/:id` | Professor com `id`, `name` e `department` |
+| GET | `/professors/:id/reviews` | Lista de avaliações com `id`, `professorId`, `rating` e `comment` |
+| POST | `/professors/:id/reviews` | Cria uma avaliação fictícia e responde `201` com o registro criado |
+
+O corpo de `POST /professors/:id/reviews` deve conter `rating` inteiro de 1 a 5 e `comment` não vazio. A API responde `400` para ID ou corpo inválido, `404` quando o professor não existe e `400` com erro específico para JSON malformado.
 
 ## Verificações
 
