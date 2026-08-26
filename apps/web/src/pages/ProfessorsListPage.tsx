@@ -31,24 +31,30 @@ export function ProfessorsListPage() {
   }, []);
 
   if (loadState === "loading") {
-    return <p>Carregando...</p>;
+    return <p className="state-message">Carregando...</p>;
   }
 
   if (loadState === "error") {
-    return <p role="alert">Não foi possível carregar os professores.</p>;
+    return <p className="state-message" role="alert">Não foi possível carregar os professores.</p>;
   }
 
   if (professors.length === 0) {
-    return <p>Nenhum professor encontrado.</p>;
+    return <p className="state-message">Nenhum professor encontrado.</p>;
   }
 
   return (
-    <main>
-      <h1>Professores</h1>
-      <ul>
+    <main className="page-shell">
+      <header className="page-header">
+        <p className="eyebrow">ProfRate</p>
+        <h1>Professores</h1>
+        <p className="page-intro">Consulte professores e conheça as avaliações fictícias.</p>
+      </header>
+      <ul className="professor-list">
         {professors.map((professor) => (
-          <li key={professor.id}>
-            <Link to={`/professors/${professor.id}`}>{professor.name}</Link>
+          <li className="professor-card" key={professor.id}>
+            <Link className="professor-card-link" to={`/professors/${professor.id}`}>
+              {professor.name}
+            </Link>
           </li>
         ))}
       </ul>

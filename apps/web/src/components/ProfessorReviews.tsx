@@ -57,21 +57,21 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
   }
 
   return (
-    <section aria-labelledby="reviews-heading">
+    <section className="review-section" aria-labelledby="reviews-heading">
       <h2 id="reviews-heading">Avaliações</h2>
-      {loadState === "loading" ? <p>Carregando avaliações...</p> : null}
+      {loadState === "loading" ? <p className="state-message">Carregando avaliações...</p> : null}
       {loadState === "error" ? (
-        <p role="alert">Não foi possível carregar as avaliações.</p>
+        <p className="state-message" role="alert">Não foi possível carregar as avaliações.</p>
       ) : null}
       {loadState === "success" && reviews.length === 0 ? (
-        <p>Nenhuma avaliação ainda.</p>
+        <p className="state-message">Nenhuma avaliação ainda.</p>
       ) : null}
       {loadState === "success" && reviews.length > 0 ? (
-        <ul>
+        <ul className="review-list">
           {reviews.map((review) => (
-            <li key={review.id}>
-              <p>Nota: {review.rating}/5</p>
-              <p>{review.comment}</p>
+            <li className="review-card" key={review.id}>
+              <p className="review-rating">Nota: {review.rating}/5</p>
+              <p className="review-comment">{review.comment}</p>
             </li>
           ))}
         </ul>

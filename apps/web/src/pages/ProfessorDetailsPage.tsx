@@ -71,16 +71,16 @@ export function ProfessorDetailsPage() {
   }, [id]);
 
   if (loadState === "loading") {
-    return <p>Carregando professor...</p>;
+    return <p className="state-message">Carregando professor...</p>;
   }
 
   if (loadState === "success" && professor !== null) {
     return (
-      <main>
+      <main className="page-shell">
         <h1>{professor.name}</h1>
-        <p>Departamento: {professor.department}</p>
+        <p className="professor-department">Departamento: {professor.department}</p>
         <ProfessorReviews professorId={professor.id} />
-        <Link to="/">Voltar para a lista</Link>
+        <Link className="back-link" to="/">Voltar para a lista</Link>
       </main>
     );
   }
@@ -93,9 +93,9 @@ export function ProfessorDetailsPage() {
         : "Não foi possível carregar o professor.";
 
   return (
-    <main>
-      <p role="alert">{message}</p>
-      <Link to="/">Voltar para a lista</Link>
+    <main className="page-shell">
+      <p className="state-message" role="alert">{message}</p>
+      <Link className="back-link" to="/">Voltar para a lista</Link>
     </main>
   );
 }

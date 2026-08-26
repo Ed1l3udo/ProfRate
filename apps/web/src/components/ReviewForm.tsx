@@ -91,6 +91,7 @@ export function ReviewForm({
       <h3>Nova avaliação</h3>
       <label htmlFor="review-rating">Nota</label>
       <input
+        className="review-input"
         id="review-rating"
         type="number"
         min="1"
@@ -104,6 +105,7 @@ export function ReviewForm({
       />
       <label htmlFor="review-comment">Comentário</label>
       <textarea
+        className="review-input review-textarea"
         id="review-comment"
         value={comment}
         onChange={(event) => {
@@ -111,17 +113,17 @@ export function ReviewForm({
           setFeedback(null);
         }}
       />
-      <button type="submit" disabled={isSubmitting}>
+      <button className="review-submit" type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Enviando..." : "Enviar avaliação"}
       </button>
       {feedback === "validation" ? (
-        <p role="alert">Preencha uma nota de 1 a 5 e um comentário.</p>
+        <p className="form-feedback" role="alert">Preencha uma nota de 1 a 5 e um comentário.</p>
       ) : null}
       {feedback === "success" ? (
-        <p role="status">Avaliação enviada com sucesso.</p>
+        <p className="form-feedback" role="status">Avaliação enviada com sucesso.</p>
       ) : null}
       {feedback === "error" ? (
-        <p role="alert">Não foi possível enviar a avaliação.</p>
+        <p className="form-feedback" role="alert">Não foi possível enviar a avaliação.</p>
       ) : null}
     </form>
   );
