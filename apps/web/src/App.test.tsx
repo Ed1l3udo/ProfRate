@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 
 import { App } from "./App.js";
@@ -145,6 +145,7 @@ describe("professor details", () => {
 
     expect(await screen.findByRole("heading", { name: "Avaliações" })).toBeInTheDocument();
     expect(screen.getByText("Carregando avaliações...")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Nova avaliação" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -165,6 +166,7 @@ describe("professor details", () => {
     renderApp("/professors/1");
 
     expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nova avaliação" })).toBeInTheDocument();
     expect(screen.getByText("Nota: 4/5")).toBeInTheDocument();
     expect(
       screen.getByText("Explicações claras e atividades bem organizadas."),
@@ -201,6 +203,181 @@ describe("professor details", () => {
 
     expect(await screen.findByText("Nenhuma avaliação ainda.")).toBeInTheDocument();
   });
+
+  it("creates a review and appends it without another reviews GET", async () => {
+    const postResponse = createDeferred<{
+      ok: boolean;
+      status: number;
+      json: () => Promise<typeof adaReviews[number]>;
+    }>();
+    const createdReview = {
+      id: 3,
+      professorId: 1,
+      rating: 5,
+      comment: "Comentário normalizado.",
+    };
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews" && options?.method === "POST") {
+        return postResponse.promise;
+      }
+
+      if (url === "/api/professors/1/reviews") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+
+    expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("Comentário"), {
+      target: { value: "  Comentário digitado  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
+
+    expect(screen.getByRole("button", { name: "Enviando..." })).toBeDisabled();
+    const postCall = fetchMock.mock.calls.find(
+      ([url, options]) => url === "/api/professors/1/reviews" && options?.method === "POST",
+    );
+    expect(postCall?.[1]).toMatchObject({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: expect.any(AbortSignal),
+    });
+    expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({
+      rating: 5,
+      comment: "  Comentário digitado  ",
+    });
+
+    postResponse.resolve({ ok: true, status: 201, json: async () => createdReview });
+
+    expect(await screen.findByText("Comentário normalizado.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Avaliação enviada com sucesso.",
+    );
+    expect(screen.getByLabelText("Nota")).toHaveValue(null);
+    expect(screen.getByLabelText("Comentário")).toHaveValue("");
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, options]) => url === "/api/professors/1/reviews" && options?.method !== "POST",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("replaces the empty state with a created review", async () => {
+    const createdReview = {
+      id: 3,
+      professorId: 1,
+      rating: 4,
+      comment: "Primeira avaliação.",
+    };
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews" && options?.method === "POST") {
+        return Promise.resolve({ ok: true, status: 201, json: async () => createdReview });
+      }
+
+      if (url === "/api/professors/1/reviews") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    expect(await screen.findByText("Nenhuma avaliação ainda.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("Comentário"), {
+      target: { value: "Primeira avaliação." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
+
+    expect(await screen.findByText("Primeira avaliação.")).toBeInTheDocument();
+    expect(screen.queryByText("Nenhuma avaliação ainda.")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["0", "Comentário válido"],
+    ["6", "Comentário válido"],
+    ["5", "   "],
+  ])("rejects invalid review fields locally", async (invalidRating, invalidComment) => {
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByRole("heading", { name: "Nova avaliação" });
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: invalidRating } });
+    fireEvent.change(screen.getByLabelText("Comentário"), {
+      target: { value: invalidComment },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Preencha uma nota de 1 a 5 e um comentário.",
+    );
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, options]) => url === "/api/professors/1/reviews" && options?.method === "POST",
+      ),
+    ).toBe(false);
+  });
+
+  it.each(["500 response", "network rejection"])(
+    "shows a generic error when review creation has a %s",
+    async (label) => {
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews" && options?.method === "POST") {
+        return label === "500 response"
+          ? Promise.resolve({ ok: false, status: 500 })
+          : Promise.reject(new Error("Network error"));
+      }
+
+      if (url === "/api/professors/1/reviews") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByRole("heading", { name: "Nova avaliação" });
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("Comentário"), {
+      target: { value: "Comentário" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível enviar a avaliação.",
+    );
+    },
+  );
 
   it("shows the generic reviews error for a 500 response", async () => {
     const fetchMock = vi.fn((url: string) => {

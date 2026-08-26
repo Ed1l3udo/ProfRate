@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ReviewForm } from "./ReviewForm.js";
 import type { Review } from "../types/professor.js";
 
 type LoadState = "loading" | "success" | "error";
@@ -51,6 +52,10 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
     };
   }, [professorId]);
 
+  function handleReviewCreated(review: Review) {
+    setReviews((currentReviews) => [...currentReviews, review]);
+  }
+
   return (
     <section aria-labelledby="reviews-heading">
       <h2 id="reviews-heading">Avaliações</h2>
@@ -70,6 +75,9 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
             </li>
           ))}
         </ul>
+      ) : null}
+      {loadState === "success" ? (
+        <ReviewForm professorId={professorId} onReviewCreated={handleReviewCreated} />
       ) : null}
     </section>
   );

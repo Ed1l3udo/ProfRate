@@ -18,3 +18,26 @@ p {
 ul {
   padding-left: 1.25rem;
 }
+
+.review-form {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 40rem;
+  margin: 2rem auto 0;
+  padding: 0 1rem;
+}
+
+.review-form input,
+.review-form textarea {
+  font: inherit;
+  padding: 0.5rem;
+}
+
+.review-form textarea {
+  min-height: 6rem;
+}
+
+.review-form button {
+  justify-self: start;
+  padding: 0.5rem 0.75rem;
+}
