@@ -5,5 +5,11 @@
   "engines": {
     "node": ">=24 <25",
     "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "typecheck": "pnpm --recursive --if-present typecheck",
+    "test": "pnpm --recursive --if-present test",
+    "build": "pnpm --recursive --if-present build",
+    "check": "pnpm typecheck && pnpm test && pnpm build"
   }
 }
