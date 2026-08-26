@@ -1,6 +1,7 @@
 export type ProfessorSummary = {
   id: number;
   name: string;
+  department: string;
 };
 
 export type ProfessorDetails = ProfessorSummary & {

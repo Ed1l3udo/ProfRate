@@ -13,9 +13,9 @@ const testReview = {
 describe("GET /professors", () => {
   it("returns the professors provided by the repository", async () => {
     const professors = [
-      { id: 1, name: "Ada Ribeiro" },
-      { id: 2, name: "Caio Nogueira" },
-      { id: 3, name: "Lina Vasconcelos" },
+      { id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" },
+      { id: 2, name: "Caio Nogueira", department: "Departamento Horizonte" },
+      { id: 3, name: "Lina Vasconcelos", department: "Departamento Pioneiro" },
     ];
     const listProfessors = vi.fn().mockResolvedValue(professors);
     const app = createApp({
@@ -30,6 +30,79 @@ describe("GET /professors", () => {
     expect(response.status).toBe(200);
     expect(response.body).toStrictEqual(professors);
     expect(listProfessors).toHaveBeenCalledOnce();
+    expect(listProfessors).toHaveBeenCalledWith({});
+  });
+
+  it("passes a trimmed search filter to the repository", async () => {
+    const listProfessors = vi.fn().mockResolvedValue([]);
+    const app = createApp({
+      createReview: async () => testReview,
+      findProfessorById: async () => undefined,
+      listProfessors,
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app).get("/professors?search=%20ada%20");
+
+    expect(response.status).toBe(200);
+    expect(listProfessors).toHaveBeenCalledWith({ search: "ada" });
+  });
+
+  it("passes a trimmed department filter to the repository", async () => {
+    const listProfessors = vi.fn().mockResolvedValue([]);
+    const app = createApp({
+      createReview: async () => testReview,
+      findProfessorById: async () => undefined,
+      listProfessors,
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app).get("/professors?department=%20aurora%20");
+
+    expect(response.status).toBe(200);
+    expect(listProfessors).toHaveBeenCalledWith({ department: "aurora" });
+  });
+
+  it("passes both filters to the repository", async () => {
+    const listProfessors = vi.fn().mockResolvedValue([]);
+    const app = createApp({
+      createReview: async () => testReview,
+      findProfessorById: async () => undefined,
+      listProfessors,
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app).get(
+      "/professors?search=%20ada%20&department=%20aurora%20",
+    );
+
+    expect(response.status).toBe(200);
+    expect(listProfessors).toHaveBeenCalledWith({ search: "ada", department: "aurora" });
+  });
+
+  it.each([
+    "/professors?search=",
+    "/professors?search=ada&search=caio",
+    "/professors?search=ada&extra=value",
+  ])("rejects invalid professor filters without querying the repository: %s", async (path) => {
+    const listProfessors = vi.fn();
+    const app = createApp({
+      createReview: async () => testReview,
+      findProfessorById: async () => undefined,
+      listProfessors,
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app).get(path);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toStrictEqual({
+      error: {
+        code: "INVALID_PROFESSOR_FILTERS",
+        message: "Professor filters must be non-empty text values.",
+      },
+    });
+    expect(listProfessors).not.toHaveBeenCalled();
   });
 });
 

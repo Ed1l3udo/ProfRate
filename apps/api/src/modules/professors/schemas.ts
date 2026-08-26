@@ -10,6 +10,11 @@ export const professorNotFoundError = {
   message: "Professor not found.",
 };
 
+export const invalidProfessorFiltersError = {
+  code: "INVALID_PROFESSOR_FILTERS",
+  message: "Professor filters must be non-empty text values.",
+};
+
 export const professorIdParamsSchema = z.object({
   id: z
     .string()
@@ -17,3 +22,14 @@ export const professorIdParamsSchema = z.object({
     .transform((value) => Number(value))
     .pipe(z.number().int().positive().max(2_147_483_647)),
 });
+
+const professorFilterValueSchema = z.string().trim().min(1);
+
+export const professorFiltersSchema = z
+  .object({
+    search: professorFilterValueSchema.optional(),
+    department: professorFilterValueSchema.optional(),
+  })
+  .strict();
+
+export type ProfessorFilters = z.infer<typeof professorFiltersSchema>;

@@ -94,6 +94,55 @@ h3 {
   list-style: none;
 }
 
+.professor-filters {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #d9e3ec;
+  border-radius: 0.75rem;
+  background: #ffffff;
+}
+
+.filter-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.filter-field input {
+  width: 100%;
+  border: 1px solid #aebdca;
+  border-radius: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  color: #243447;
+}
+
+.filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.filter-actions button {
+  border: 1px solid #176b87;
+  border-radius: 0.45rem;
+  background: #176b87;
+  padding: 0.6rem 0.85rem;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.filter-actions button[type="button"] {
+  background: #ffffff;
+  color: #176b87;
+}
+
+.filter-actions button:hover {
+  background: #0e4f65;
+  color: #ffffff;
+}
+
 .professor-card,
 .review-card,
 .review-section {
@@ -118,6 +167,14 @@ h3 {
   font-size: 1.05rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.professor-card-link small {
+  display: block;
+  margin-top: 0.25rem;
+  color: #617286;
+  font-size: 0.9rem;
+  font-weight: 400;
 }
 
 .review-section {

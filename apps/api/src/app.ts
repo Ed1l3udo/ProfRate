@@ -5,6 +5,8 @@ import express, {
 } from "express";
 import {
   invalidProfessorIdError,
+  invalidProfessorFiltersError,
+  professorFiltersSchema,
   professorIdParamsSchema,
   professorNotFoundError,
 } from "./modules/professors/schemas.js";
@@ -52,10 +54,18 @@ export function createApp({
     response.status(200).json({ status: "ok" });
   });
 
-  app.get("/professors", async (_request, response) => {
-    const professors = await listProfessors();
+  app.get("/professors", async (request, response) => {
+    const parsedFilters = professorFiltersSchema.safeParse(request.query);
 
-    response.status(200).json(professors);
+    if (!parsedFilters.success) {
+      return response.status(400).json({
+        error: invalidProfessorFiltersError,
+      });
+    }
+
+    const professors = await listProfessors(parsedFilters.data);
+
+    return response.status(200).json(professors);
   });
 
   app.get("/professors/:id", async (request, response) => {
