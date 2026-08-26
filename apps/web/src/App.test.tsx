@@ -145,6 +145,7 @@ describe("professor details", () => {
 
     expect(await screen.findByRole("heading", { name: "Avaliações" })).toBeInTheDocument();
     expect(screen.getByText("Carregando avaliações...")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Resumo das avaliações")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Nova avaliação" })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -166,6 +167,8 @@ describe("professor details", () => {
     renderApp("/professors/1");
 
     expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("2 avaliações");
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 4,5/5");
     expect(screen.getByRole("heading", { name: "Nova avaliação" })).toBeInTheDocument();
     expect(screen.getByText("Nota: 4/5")).toBeInTheDocument();
     expect(
@@ -202,6 +205,33 @@ describe("professor details", () => {
     renderApp("/professors/1");
 
     expect(await screen.findByText("Nenhuma avaliação ainda.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("0 avaliações");
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Sem média");
+  });
+
+  it("uses the singular label and rating for one review", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews") {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [adaReviews[0]],
+        });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+
+    expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("1 avaliação");
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 5,0/5");
   });
 
   it("creates a review and appends it without another reviews GET", async () => {
@@ -262,6 +292,8 @@ describe("professor details", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Avaliação enviada com sucesso.",
     );
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("3 avaliações");
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 4,7/5");
     expect(screen.getByLabelText("Nota")).toHaveValue(null);
     expect(screen.getByLabelText("Comentário")).toHaveValue("");
     expect(
@@ -398,6 +430,7 @@ describe("professor details", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Não foi possível carregar as avaliações.",
     );
+    expect(screen.queryByLabelText("Resumo das avaliações")).not.toBeInTheDocument();
   });
 
   it("shows the generic reviews error when the request is rejected", async () => {

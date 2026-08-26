@@ -125,6 +125,19 @@ h3 {
   padding: 1.25rem;
 }
 
+.review-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-bottom: 1rem;
+  color: #617286;
+  font-weight: 700;
+}
+
+.review-summary p {
+  margin: 0;
+}
+
 .review-card {
   padding: 1rem;
   box-shadow: none;

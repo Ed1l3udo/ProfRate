@@ -56,12 +56,32 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
     setReviews((currentReviews) => [...currentReviews, review]);
   }
 
+  const reviewCount = reviews.length;
+  const averageRating =
+    reviewCount === 0
+      ? null
+      : reviews.reduce((total, review) => total + review.rating, 0) / reviewCount;
+  const formattedAverage =
+    averageRating === null
+      ? null
+      : new Intl.NumberFormat("pt-BR", {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }).format(averageRating);
+  const reviewCountLabel = `${reviewCount} ${reviewCount === 1 ? "avaliação" : "avaliações"}`;
+
   return (
     <section className="review-section" aria-labelledby="reviews-heading">
       <h2 id="reviews-heading">Avaliações</h2>
       {loadState === "loading" ? <p className="state-message">Carregando avaliações...</p> : null}
       {loadState === "error" ? (
         <p className="state-message" role="alert">Não foi possível carregar as avaliações.</p>
+      ) : null}
+      {loadState === "success" ? (
+        <div className="review-summary" aria-label="Resumo das avaliações">
+          <p>{reviewCountLabel}</p>
+          <p>{formattedAverage === null ? "Sem média" : `Média: ${formattedAverage}/5`}</p>
+        </div>
       ) : null}
       {loadState === "success" && reviews.length === 0 ? (
         <p className="state-message">Nenhuma avaliação ainda.</p>
