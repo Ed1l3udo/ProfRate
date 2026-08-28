@@ -15,10 +15,14 @@ import type { listProfessors as listProfessorsRepository } from "./modules/profe
 import type { listReviewsByProfessorId as listReviewsByProfessorIdRepository } from "./modules/reviews/repository.js";
 import type { createReview as createReviewRepository } from "./modules/reviews/repository.js";
 import {
+  invalidReviewIdError,
   invalidJsonBodyError,
   invalidReviewInputError,
   createReviewBodySchema,
+  reviewIdParamsSchema,
+  reviewNotFoundError,
 } from "./modules/reviews/schemas.js";
+import type { deleteReview as deleteReviewRepository } from "./modules/reviews/repository.js";
 
 function isJsonParsingError(error: unknown): error is SyntaxError & {
   status: number;
@@ -40,11 +44,13 @@ export function createApp({
   findProfessorById,
   listProfessors,
   listReviewsByProfessorId,
+  deleteReview,
 }: {
   createReview: typeof createReviewRepository;
   findProfessorById: typeof findProfessorByIdRepository;
   listProfessors: typeof listProfessorsRepository;
   listReviewsByProfessorId: typeof listReviewsByProfessorIdRepository;
+  deleteReview: typeof deleteReviewRepository;
 }) {
   const app = express();
 
@@ -143,6 +149,52 @@ export function createApp({
 
     return response.status(201).json(review);
   });
+
+  app.delete(
+    "/professors/:professorId/reviews/:reviewId",
+    async (request, response) => {
+      const parsedProfessorId = professorIdParamsSchema.safeParse({
+        id: request.params.professorId,
+      });
+
+      if (!parsedProfessorId.success) {
+        return response.status(400).json({
+          error: invalidProfessorIdError,
+        });
+      }
+
+      const parsedReviewId = reviewIdParamsSchema.safeParse({
+        reviewId: request.params.reviewId,
+      });
+
+      if (!parsedReviewId.success) {
+        return response.status(400).json({
+          error: invalidReviewIdError,
+        });
+      }
+
+      const professor = await findProfessorById(parsedProfessorId.data.id);
+
+      if (professor === undefined) {
+        return response.status(404).json({
+          error: professorNotFoundError,
+        });
+      }
+
+      const deletedReview = await deleteReview({
+        professorId: parsedProfessorId.data.id,
+        reviewId: parsedReviewId.data.reviewId,
+      });
+
+      if (deletedReview === undefined) {
+        return response.status(404).json({
+          error: reviewNotFoundError,
+        });
+      }
+
+      return response.status(204).send();
+    },
+  );
 
   app.use(
     (

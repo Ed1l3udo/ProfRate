@@ -17,3 +17,21 @@ export const createReviewBodySchema = z
     comment: z.string().trim().min(1),
   })
   .strict();
+
+export const reviewIdParamsSchema = z.object({
+  reviewId: z
+    .string()
+    .regex(/^[1-9]\d*$/)
+    .transform((value) => Number(value))
+    .pipe(z.number().int().positive().max(2_147_483_647)),
+});
+
+export const invalidReviewIdError = {
+  code: "INVALID_REVIEW_ID",
+  message: "Review id must be a positive integer.",
+};
+
+export const reviewNotFoundError = {
+  code: "REVIEW_NOT_FOUND",
+  message: "Review not found.",
+};

@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../../db/client.js";
 import { reviews } from "../../db/schema.js";
@@ -36,4 +36,24 @@ export async function createReview({
     });
 
   return review;
+}
+
+export async function deleteReview({
+  professorId,
+  reviewId,
+}: {
+  professorId: number;
+  reviewId: number;
+}) {
+  const deletedReviews = await db
+    .delete(reviews)
+    .where(and(eq(reviews.id, reviewId), eq(reviews.professorId, professorId)))
+    .returning({
+      id: reviews.id,
+      professorId: reviews.professorId,
+      rating: reviews.rating,
+      comment: reviews.comment,
+    });
+
+  return deletedReviews.at(0);
 }

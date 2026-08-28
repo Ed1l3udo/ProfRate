@@ -210,6 +210,57 @@ h3 {
   margin: 0.35rem 0 0;
 }
 
+.review-delete-confirmation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.85rem;
+}
+
+.review-delete-confirmation p {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: 700;
+}
+
+.review-delete,
+.review-delete-confirm,
+.review-delete-cancel {
+  border: 1px solid #176b87;
+  border-radius: 0.45rem;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.review-delete,
+.review-delete-confirm {
+  background: #176b87;
+  color: #ffffff;
+}
+
+.review-delete-cancel {
+  background: #ffffff;
+  color: #176b87;
+}
+
+.review-delete:hover,
+.review-delete-confirm:hover:not(:disabled) {
+  background: #0e4f65;
+}
+
+.review-delete-cancel:hover:not(:disabled) {
+  background: #eef6f8;
+}
+
+.review-delete:disabled,
+.review-delete-confirm:disabled,
+.review-delete-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .review-form {
   display: grid;
   gap: 0.55rem;

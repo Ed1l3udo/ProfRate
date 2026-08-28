@@ -20,6 +20,7 @@ describe("GET /professors", () => {
     const listProfessors = vi.fn().mockResolvedValue(professors);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById: async () => undefined,
       listProfessors,
       listReviewsByProfessorId: async () => [],
@@ -37,6 +38,7 @@ describe("GET /professors", () => {
     const listProfessors = vi.fn().mockResolvedValue([]);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById: async () => undefined,
       listProfessors,
       listReviewsByProfessorId: async () => [],
@@ -52,6 +54,7 @@ describe("GET /professors", () => {
     const listProfessors = vi.fn().mockResolvedValue([]);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById: async () => undefined,
       listProfessors,
       listReviewsByProfessorId: async () => [],
@@ -67,6 +70,7 @@ describe("GET /professors", () => {
     const listProfessors = vi.fn().mockResolvedValue([]);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById: async () => undefined,
       listProfessors,
       listReviewsByProfessorId: async () => [],
@@ -88,6 +92,7 @@ describe("GET /professors", () => {
     const listProfessors = vi.fn();
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById: async () => undefined,
       listProfessors,
       listReviewsByProfessorId: async () => [],
@@ -116,6 +121,7 @@ describe("GET /professors/:id", () => {
     const findProfessorById = vi.fn().mockResolvedValue(professor);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -133,6 +139,7 @@ describe("GET /professors/:id", () => {
     const findProfessorById = vi.fn().mockResolvedValue(undefined);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -157,6 +164,7 @@ describe("GET /professors/:id", () => {
       const findProfessorById = vi.fn();
       const app = createApp({
         createReview: async () => testReview,
+        deleteReview: async () => undefined,
         findProfessorById,
         listProfessors: async () => [],
         listReviewsByProfessorId: async () => [],
@@ -200,6 +208,7 @@ describe("GET /professors/:id/reviews", () => {
     const listReviewsByProfessorId = vi.fn().mockResolvedValue(reviews);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId,
@@ -224,6 +233,7 @@ describe("GET /professors/:id/reviews", () => {
     const listReviewsByProfessorId = vi.fn().mockResolvedValue([]);
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId,
@@ -242,6 +252,7 @@ describe("GET /professors/:id/reviews", () => {
     const listReviewsByProfessorId = vi.fn();
     const app = createApp({
       createReview: async () => testReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId,
@@ -268,6 +279,7 @@ describe("GET /professors/:id/reviews", () => {
       const listReviewsByProfessorId = vi.fn();
       const app = createApp({
         createReview: async () => testReview,
+        deleteReview: async () => undefined,
         findProfessorById,
         listProfessors: async () => [],
         listReviewsByProfessorId,
@@ -304,6 +316,7 @@ describe("POST /professors/:id/reviews", () => {
     const createReview = vi.fn().mockResolvedValue(createdReview);
     const app = createApp({
       createReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -331,6 +344,7 @@ describe("POST /professors/:id/reviews", () => {
     const createReview = vi.fn();
     const app = createApp({
       createReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -359,6 +373,7 @@ describe("POST /professors/:id/reviews", () => {
       const createReview = vi.fn();
       const app = createApp({
         createReview,
+        deleteReview: async () => undefined,
         findProfessorById,
         listProfessors: async () => [],
         listReviewsByProfessorId: async () => [],
@@ -397,6 +412,7 @@ describe("POST /professors/:id/reviews", () => {
     const createReview = vi.fn();
     const app = createApp({
       createReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -421,6 +437,7 @@ describe("POST /professors/:id/reviews", () => {
     const createReview = vi.fn();
     const app = createApp({
       createReview,
+      deleteReview: async () => undefined,
       findProfessorById,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],
@@ -440,5 +457,118 @@ describe("POST /professors/:id/reviews", () => {
     });
     expect(findProfessorById).not.toHaveBeenCalled();
     expect(createReview).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /professors/:professorId/reviews/:reviewId", () => {
+  const existingProfessor = {
+    id: 1,
+    name: "Ada Ribeiro",
+    department: "Departamento Aurora",
+  };
+
+  function createDeleteApp(
+    findProfessorById: (id: number) => Promise<{
+      id: number;
+      name: string;
+      department: string;
+    } | undefined>,
+    deleteReview: (args: { professorId: number; reviewId: number }) => Promise<{
+      id: number;
+      professorId: number;
+      rating: number;
+      comment: string;
+    } | undefined>,
+  ) {
+    return createApp({
+      createReview: async () => testReview,
+      deleteReview,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+    });
+  }
+
+  it("returns 204 with no body and passes numeric ids", async () => {
+    const findProfessorById = vi.fn().mockResolvedValue(existingProfessor);
+    const deleteReview = vi.fn().mockResolvedValue({
+      id: 4,
+      professorId: 1,
+      rating: 5,
+      comment: "Temporária",
+    });
+
+    const response = await request(
+      createDeleteApp(findProfessorById, deleteReview),
+    ).delete("/professors/1/reviews/4");
+
+    expect(response.status).toBe(204);
+    expect(response.text).toBe("");
+    expect(findProfessorById).toHaveBeenCalledWith(1);
+    expect(deleteReview).toHaveBeenCalledWith({ professorId: 1, reviewId: 4 });
+  });
+
+  it.each([
+    ["professors/abc/reviews/4", "INVALID_PROFESSOR_ID", "Professor id must be a positive integer."],
+    ["professors/1/reviews/abc", "INVALID_REVIEW_ID", "Review id must be a positive integer."],
+    ["professors/1/reviews/0", "INVALID_REVIEW_ID", "Review id must be a positive integer."],
+    ["professors/1/reviews/-1", "INVALID_REVIEW_ID", "Review id must be a positive integer."],
+    ["professors/1/reviews/1.5", "INVALID_REVIEW_ID", "Review id must be a positive integer."],
+    ["professors/1/reviews/1e3", "INVALID_REVIEW_ID", "Review id must be a positive integer."],
+    ["professors/1/reviews/01", "INVALID_REVIEW_ID", "Review id must be a positive integer."],
+    ["professors/1/reviews/2147483648", "INVALID_REVIEW_ID", "Review id must be a positive integer."],
+  ])("rejects invalid ids without querying repositories: %s", async (path, code, message) => {
+    const findProfessorById = vi.fn();
+    const deleteReview = vi.fn();
+    const response = await request(createDeleteApp(findProfessorById, deleteReview)).delete(`/${path}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toStrictEqual({ error: { code, message } });
+    expect(findProfessorById).not.toHaveBeenCalled();
+    expect(deleteReview).not.toHaveBeenCalled();
+  });
+
+  it("returns professor not found without deleting", async () => {
+    const findProfessorById = vi.fn().mockResolvedValue(undefined);
+    const deleteReview = vi.fn();
+    const response = await request(createDeleteApp(findProfessorById, deleteReview)).delete(
+      "/professors/999999/reviews/4",
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("PROFESSOR_NOT_FOUND");
+    expect(deleteReview).not.toHaveBeenCalled();
+  });
+
+  it("returns review not found when the review does not exist", async () => {
+    const findProfessorById = vi.fn().mockResolvedValue(existingProfessor);
+    const deleteReview = vi.fn().mockResolvedValue(undefined);
+    const response = await request(createDeleteApp(findProfessorById, deleteReview)).delete(
+      "/professors/1/reviews/999",
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.body).toStrictEqual({
+      error: { code: "REVIEW_NOT_FOUND", message: "Review not found." },
+    });
+    expect(deleteReview).toHaveBeenCalledWith({ professorId: 1, reviewId: 999 });
+  });
+
+  it("returns review not found when the review belongs to another professor", async () => {
+    const findProfessorById = vi.fn().mockResolvedValue({
+      id: 2,
+      name: "Caio Nogueira",
+      department: "Departamento Horizonte",
+    });
+    const deleteReview = vi.fn().mockResolvedValue(undefined);
+    const response = await request(createDeleteApp(findProfessorById, deleteReview)).delete(
+      "/professors/2/reviews/1",
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.body).toStrictEqual({
+      error: { code: "REVIEW_NOT_FOUND", message: "Review not found." },
+    });
+    expect(deleteReview).toHaveBeenCalledWith({ professorId: 2, reviewId: 1 });
   });
 });

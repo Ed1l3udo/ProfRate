@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 
 import { App } from "./App.js";
@@ -180,7 +180,7 @@ describe("professors list", () => {
       ok: boolean;
       json: () => Promise<unknown>;
     }>();
-    const fetchMock = vi.fn((url: string) => {
+    const fetchMock = vi.fn((url: string, _options?: RequestInit) => {
       if (url === "/api/professors") {
         return Promise.resolve({
           ok: true,
@@ -650,5 +650,183 @@ describe("professor details", () => {
       "Identificador de professor inválido.",
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("review deletion", () => {
+  it("opens confirmation and cancelling does not call DELETE", async () => {
+    const fetchMock = vi.fn((url: string, _options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Excluir avaliação" })[0]);
+    expect(screen.getByText("Deseja excluir esta avaliação?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.queryByText("Deseja excluir esta avaliação?")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "DELETE")).toBe(false);
+  });
+
+  it("deletes a review with the exact URL and signal and recalculates the summary", async () => {
+    const deleteResponse = createDeferred<{ ok: boolean; status: number }>();
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews/1" && options?.method === "DELETE") {
+        return deleteResponse.promise;
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+    fireEvent.click(screen.getAllByRole("button", { name: "Excluir avaliação" })[0]);
+    const confirmButton = screen.getByRole("button", { name: "Confirmar exclusão" });
+
+    act(() => {
+      confirmButton.click();
+      confirmButton.click();
+    });
+
+    expect(screen.getByRole("button", { name: "Excluindo..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+    const deleteCall = fetchMock.mock.calls.find(
+      ([url, options]) => url === "/api/professors/1/reviews/1" && options?.method === "DELETE",
+    );
+    expect(deleteCall?.[1]).toMatchObject({ method: "DELETE", signal: expect.any(AbortSignal) });
+    expect(
+      fetchMock.mock.calls.filter(([, options]) => options?.method === "DELETE"),
+    ).toHaveLength(1);
+
+    deleteResponse.resolve({ ok: true, status: 204 });
+    await screen.findByText("1 avaliação");
+    expect(screen.queryByText("Explicações claras e atividades bem organizadas.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 4,0/5");
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, options]) =>
+          url === "/api/professors/1/reviews" && options?.method !== "DELETE",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("shows the empty state after deleting the last review", async () => {
+    const onlyReview = [adaReviews[0]];
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "DELETE") {
+        return Promise.resolve({ ok: true, status: 204 });
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => onlyReview });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    fireEvent.click(screen.getByRole("button", { name: "Excluir avaliação" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar exclusão" }));
+
+    expect(await screen.findByText("Nenhuma avaliação ainda.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("0 avaliações");
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Sem média");
+  });
+
+  it.each([
+    ["404 response", () => Promise.resolve({ ok: false, status: 404 })],
+    ["500 response", () => Promise.resolve({ ok: false, status: 500 })],
+    ["network rejection", () => Promise.reject(new Error("Network error"))],
+  ])("shows a deletion alert for a %s", async (_label, deleteResult) => {
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "DELETE") {
+        return deleteResult();
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+    fireEvent.click(screen.getAllByRole("button", { name: "Excluir avaliação" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar exclusão" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível excluir a avaliação.",
+    );
+  });
+
+  it("clears a previous deletion error when cancelling", async () => {
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "DELETE") {
+        return Promise.resolve({ ok: false, status: 404 });
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+    fireEvent.click(screen.getAllByRole("button", { name: "Excluir avaliação" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar exclusão" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Não foi possível excluir a avaliação.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("Deseja excluir esta avaliação?")).not.toBeInTheDocument();
+  });
+
+  it("aborts a pending deletion when the component unmounts", async () => {
+    const deleteResponse = createDeferred<{ ok: boolean; status: number }>();
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "DELETE") {
+        return deleteResponse.promise;
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const view = renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+    fireEvent.click(screen.getAllByRole("button", { name: "Excluir avaliação" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar exclusão" }));
+    const deleteCall = fetchMock.mock.calls.find(([, options]) => options?.method === "DELETE");
+    const signal = deleteCall?.[1]?.signal;
+
+    expect(signal?.aborted).toBe(false);
+    view.unmount();
+    expect(signal?.aborted).toBe(true);
   });
 });

@@ -12,6 +12,7 @@ describe("GET /health", () => {
         rating: 1,
         comment: "",
       }),
+      deleteReview: async () => undefined,
       findProfessorById: async () => undefined,
       listProfessors: async () => [],
       listReviewsByProfessorId: async () => [],

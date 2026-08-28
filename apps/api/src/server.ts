@@ -5,12 +5,14 @@ import {
 } from "./modules/professors/repository.js";
 import {
   createReview,
+  deleteReview,
   listReviewsByProfessorId,
 } from "./modules/reviews/repository.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const app = createApp({
   createReview,
+  deleteReview,
   findProfessorById,
   listProfessors,
   listReviewsByProfessorId,

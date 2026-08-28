@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ReviewForm } from "./ReviewForm.js";
+import { ReviewItem } from "./ReviewItem.js";
 import type { Review } from "../types/professor.js";
 
 type LoadState = "loading" | "success" | "error";
@@ -56,6 +57,12 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
     setReviews((currentReviews) => [...currentReviews, review]);
   }
 
+  function handleReviewDeleted(reviewId: number) {
+    setReviews((currentReviews) =>
+      currentReviews.filter((review) => review.id !== reviewId),
+    );
+  }
+
   const reviewCount = reviews.length;
   const averageRating =
     reviewCount === 0
@@ -89,10 +96,12 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
       {loadState === "success" && reviews.length > 0 ? (
         <ul className="review-list">
           {reviews.map((review) => (
-            <li className="review-card" key={review.id}>
-              <p className="review-rating">Nota: {review.rating}/5</p>
-              <p className="review-comment">{review.comment}</p>
-            </li>
+            <ReviewItem
+              key={review.id}
+              professorId={professorId}
+              review={review}
+              onDeleted={handleReviewDeleted}
+            />
           ))}
         </ul>
       ) : null}
