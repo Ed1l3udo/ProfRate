@@ -63,6 +63,14 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
     );
   }
 
+  function handleReviewUpdated(updatedReview: Review) {
+    setReviews((currentReviews) =>
+      currentReviews.map((review) =>
+        review.id === updatedReview.id ? updatedReview : review,
+      ),
+    );
+  }
+
   const reviewCount = reviews.length;
   const averageRating =
     reviewCount === 0
@@ -101,6 +109,7 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
               professorId={professorId}
               review={review}
               onDeleted={handleReviewDeleted}
+              onUpdated={handleReviewUpdated}
             />
           ))}
         </ul>

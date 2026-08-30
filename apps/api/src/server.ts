@@ -7,6 +7,7 @@ import {
   createReview,
   deleteReview,
   listReviewsByProfessorId,
+  updateReview,
 } from "./modules/reviews/repository.js";
 
 const port = Number(process.env.PORT ?? 3000);
@@ -16,6 +17,7 @@ const app = createApp({
   findProfessorById,
   listProfessors,
   listReviewsByProfessorId,
+  updateReview,
 });
 
 app.listen(port, () => {

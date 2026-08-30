@@ -218,6 +218,19 @@ h3 {
   margin-top: 0.85rem;
 }
 
+.review-actions,
+.review-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.review-edit-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
 .review-delete-confirmation p {
   flex-basis: 100%;
   margin: 0;
@@ -226,7 +239,10 @@ h3 {
 
 .review-delete,
 .review-delete-confirm,
-.review-delete-cancel {
+.review-delete-cancel,
+.review-edit,
+.review-edit-save,
+.review-edit-cancel {
   border: 1px solid #176b87;
   border-radius: 0.45rem;
   padding: 0.5rem 0.7rem;
@@ -235,28 +251,36 @@ h3 {
 }
 
 .review-delete,
-.review-delete-confirm {
+.review-delete-confirm,
+.review-edit,
+.review-edit-save {
   background: #176b87;
   color: #ffffff;
 }
 
-.review-delete-cancel {
+.review-delete-cancel,
+.review-edit-cancel {
   background: #ffffff;
   color: #176b87;
 }
 
 .review-delete:hover,
-.review-delete-confirm:hover:not(:disabled) {
+.review-delete-confirm:hover:not(:disabled),
+.review-edit:hover,
+.review-edit-save:hover:not(:disabled) {
   background: #0e4f65;
 }
 
-.review-delete-cancel:hover:not(:disabled) {
+.review-delete-cancel:hover:not(:disabled),
+.review-edit-cancel:hover:not(:disabled) {
   background: #eef6f8;
 }
 
 .review-delete:disabled,
 .review-delete-confirm:disabled,
-.review-delete-cancel:disabled {
+.review-delete-cancel:disabled,
+.review-edit-save:disabled,
+.review-edit-cancel:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }

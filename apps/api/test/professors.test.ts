@@ -1,7 +1,19 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/app.js";
+import { createApp as createAppWithDependencies } from "../src/app.js";
+
+type AppDependencies = Parameters<typeof createAppWithDependencies>[0];
+
+function createApp(
+  dependencies: Omit<AppDependencies, "updateReview"> &
+    Partial<Pick<AppDependencies, "updateReview">>,
+) {
+  return createAppWithDependencies({
+    updateReview: async () => undefined,
+    ...dependencies,
+  });
+}
 
 const testReview = {
   id: 0,
@@ -570,5 +582,202 @@ describe("DELETE /professors/:professorId/reviews/:reviewId", () => {
       error: { code: "REVIEW_NOT_FOUND", message: "Review not found." },
     });
     expect(deleteReview).toHaveBeenCalledWith({ professorId: 2, reviewId: 1 });
+  });
+});
+
+describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
+  const existingProfessor = {
+    id: 1,
+    name: "Ada Ribeiro",
+    department: "Departamento Aurora",
+  };
+
+  function createUpdateApp(
+    findProfessorById: (id: number) => Promise<typeof existingProfessor | undefined>,
+    updateReview: AppDependencies["updateReview"],
+  ) {
+    return createApp({
+      createReview: async () => testReview,
+      deleteReview: async () => undefined,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+      updateReview,
+    });
+  }
+
+  it("updates both fields with numeric ids and a trimmed comment", async () => {
+    const updatedReview = {
+      id: 1,
+      professorId: 1,
+      rating: 5,
+      comment: "Comentário atualizado.",
+    };
+    const findProfessorById = vi.fn().mockResolvedValue(existingProfessor);
+    const updateReview = vi.fn().mockResolvedValue(updatedReview);
+    const response = await request(createUpdateApp(findProfessorById, updateReview))
+      .patch("/professors/1/reviews/1")
+      .send({ rating: 5, comment: "  Comentário atualizado.  " });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toStrictEqual(updatedReview);
+    expect(findProfessorById).toHaveBeenCalledWith(1);
+    expect(updateReview).toHaveBeenCalledWith({
+      professorId: 1,
+      reviewId: 1,
+      rating: 5,
+      comment: "Comentário atualizado.",
+    });
+  });
+
+  it("updates only the rating", async () => {
+    const updateReview = vi.fn().mockResolvedValue({
+      id: 1,
+      professorId: 1,
+      rating: 3,
+      comment: "Comentário existente.",
+    });
+    const response = await request(
+      createUpdateApp(vi.fn().mockResolvedValue(existingProfessor), updateReview),
+    )
+      .patch("/professors/1/reviews/1")
+      .send({ rating: 3 });
+
+    expect(response.status).toBe(200);
+    expect(updateReview).toHaveBeenCalledWith({
+      professorId: 1,
+      reviewId: 1,
+      rating: 3,
+    });
+  });
+
+  it("updates only the comment", async () => {
+    const updateReview = vi.fn().mockResolvedValue({
+      id: 1,
+      professorId: 1,
+      rating: 5,
+      comment: "Somente comentário.",
+    });
+    const response = await request(
+      createUpdateApp(vi.fn().mockResolvedValue(existingProfessor), updateReview),
+    )
+      .patch("/professors/1/reviews/1")
+      .send({ comment: "  Somente comentário.  " });
+
+    expect(response.status).toBe(200);
+    expect(updateReview).toHaveBeenCalledWith({
+      professorId: 1,
+      reviewId: 1,
+      comment: "Somente comentário.",
+    });
+  });
+
+  it.each([
+    ["empty body", {}],
+    ["rating 0", { rating: 0 }],
+    ["rating 6", { rating: 6 }],
+    ["decimal rating", { rating: 1.5 }],
+    ["string rating", { rating: "5" }],
+    ["empty comment", { comment: "" }],
+    ["blank comment", { comment: "   " }],
+    ["non-text comment", { comment: 123 }],
+    ["extra property", { rating: 5, extra: true }],
+  ])("rejects %s without querying repositories", async (_label, body) => {
+    const findProfessorById = vi.fn();
+    const updateReview = vi.fn();
+    const response = await request(createUpdateApp(findProfessorById, updateReview))
+      .patch("/professors/1/reviews/1")
+      .send(body);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toStrictEqual({
+      error: {
+        code: "INVALID_REVIEW_UPDATE",
+        message: "Review update must include a valid rating or non-empty comment.",
+      },
+    });
+    expect(findProfessorById).not.toHaveBeenCalled();
+    expect(updateReview).not.toHaveBeenCalled();
+  });
+
+  it.each(["abc", "0", "-1", "1.5", "1e3", "01", "2147483648"])(
+    "rejects invalid professor id %s before repositories",
+    async (id) => {
+      const findProfessorById = vi.fn();
+      const updateReview = vi.fn();
+      const response = await request(createUpdateApp(findProfessorById, updateReview))
+        .patch(`/professors/${id}/reviews/1`)
+        .send({ rating: 5 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe("INVALID_PROFESSOR_ID");
+      expect(findProfessorById).not.toHaveBeenCalled();
+      expect(updateReview).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["abc", "0", "-1", "1.5", "1e3", "01", "2147483648"])(
+    "rejects invalid review id %s before repositories",
+    async (id) => {
+      const findProfessorById = vi.fn();
+      const updateReview = vi.fn();
+      const response = await request(createUpdateApp(findProfessorById, updateReview))
+        .patch(`/professors/1/reviews/${id}`)
+        .send({ rating: 5 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe("INVALID_REVIEW_ID");
+      expect(findProfessorById).not.toHaveBeenCalled();
+      expect(updateReview).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns invalid JSON without querying repositories", async () => {
+    const findProfessorById = vi.fn();
+    const updateReview = vi.fn();
+    const response = await request(createUpdateApp(findProfessorById, updateReview))
+      .patch("/professors/1/reviews/1")
+      .set("Content-Type", "application/json")
+      .send('{"rating": 5');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_JSON_BODY");
+    expect(findProfessorById).not.toHaveBeenCalled();
+    expect(updateReview).not.toHaveBeenCalled();
+  });
+
+  it("does not update when the professor does not exist", async () => {
+    const findProfessorById = vi.fn().mockResolvedValue(undefined);
+    const updateReview = vi.fn();
+    const response = await request(createUpdateApp(findProfessorById, updateReview))
+      .patch("/professors/999999/reviews/1")
+      .send({ rating: 5 });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("PROFESSOR_NOT_FOUND");
+    expect(updateReview).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing review", 1, 999],
+    ["review from another professor", 2, 1],
+  ])("returns review not found for %s", async (_label, professorId, reviewId) => {
+    const professor = { ...existingProfessor, id: professorId };
+    const updateReview = vi.fn().mockResolvedValue(undefined);
+    const response = await request(
+      createUpdateApp(vi.fn().mockResolvedValue(professor), updateReview),
+    )
+      .patch(`/professors/${professorId}/reviews/${reviewId}`)
+      .send({ rating: 5 });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toStrictEqual({
+      error: { code: "REVIEW_NOT_FOUND", message: "Review not found." },
+    });
+    expect(updateReview).toHaveBeenCalledWith({
+      professorId,
+      reviewId,
+      rating: 5,
+    });
   });
 });

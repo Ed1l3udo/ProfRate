@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 
 import { App } from "./App.js";
@@ -668,8 +668,16 @@ describe("review deletion", () => {
     await screen.findByText("Feedbacks úteis durante os exercícios.");
 
     fireEvent.click(screen.getAllByRole("button", { name: "Excluir avaliação" })[0]);
-    expect(screen.getByText("Deseja excluir esta avaliação?")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    const confirmation = screen.getByText("Deseja excluir esta avaliação?");
+    const card = confirmation.closest("li");
+
+    if (card === null) {
+      throw new Error("Review card not found");
+    }
+
+    expect(confirmation).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Editar avaliação" })).not.toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: "Cancelar" }));
 
     expect(screen.queryByText("Deseja excluir esta avaliação?")).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([, options]) => options?.method === "DELETE")).toBe(false);
@@ -702,6 +710,13 @@ describe("review deletion", () => {
 
     expect(screen.getByRole("button", { name: "Excluindo..." })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+    const deletingCard = screen.getByText("Deseja excluir esta avaliação?").closest("li");
+    if (deletingCard === null) {
+      throw new Error("Review card not found");
+    }
+    expect(
+      within(deletingCard).queryByRole("button", { name: "Editar avaliação" }),
+    ).not.toBeInTheDocument();
     const deleteCall = fetchMock.mock.calls.find(
       ([url, options]) => url === "/api/professors/1/reviews/1" && options?.method === "DELETE",
     );
@@ -824,6 +839,243 @@ describe("review deletion", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar exclusão" }));
     const deleteCall = fetchMock.mock.calls.find(([, options]) => options?.method === "DELETE");
     const signal = deleteCall?.[1]?.signal;
+
+    expect(signal?.aborted).toBe(false);
+    view.unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+});
+
+describe("review editing", () => {
+  function getFirstReviewCard() {
+    const card = screen
+      .getByText("Explicações claras e atividades bem organizadas.")
+      .closest("li");
+
+    if (card === null) {
+      throw new Error("Review card not found");
+    }
+
+    return within(card);
+  }
+
+  it("opens with current values and cancelling restores them without PATCH", async () => {
+    const fetchMock = vi.fn((url: string, _options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    let card = getFirstReviewCard();
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+
+    expect(card.getByLabelText("Nota")).toHaveValue(5);
+    expect(card.getByLabelText("Comentário")).toHaveValue(
+      "Explicações claras e atividades bem organizadas.",
+    );
+    expect(card.queryByRole("button", { name: "Excluir avaliação" })).not.toBeInTheDocument();
+    expect(card.queryByText("Deseja excluir esta avaliação?")).not.toBeInTheDocument();
+    fireEvent.change(card.getByLabelText("Nota"), { target: { value: "2" } });
+    fireEvent.change(card.getByLabelText("Comentário"), {
+      target: { value: "Rascunho" },
+    });
+    fireEvent.click(card.getByRole("button", { name: "Cancelar edição" }));
+
+    card = getFirstReviewCard();
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    expect(card.getByLabelText("Nota")).toHaveValue(5);
+    expect(card.getByLabelText("Comentário")).toHaveValue(
+      "Explicações claras e atividades bem organizadas.",
+    );
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
+  });
+
+  it.each([
+    ["0", "Comentário válido"],
+    ["6", "Comentário válido"],
+    ["1.5", "Comentário válido"],
+    ["5", "   "],
+  ])("rejects invalid local edit values", async (rating, comment) => {
+    const fetchMock = vi.fn((url: string, _options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    const card = getFirstReviewCard();
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    fireEvent.change(card.getByLabelText("Nota"), { target: { value: rating } });
+    fireEvent.change(card.getByLabelText("Comentário"), { target: { value: comment } });
+    fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(card.getByRole("alert")).toHaveTextContent(
+      "Preencha uma nota de 1 a 5 e um comentário.",
+    );
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
+  });
+
+  it("updates once with exact request data and recalculates the average without a new GET", async () => {
+    const patchResponse = createDeferred<{
+      ok: boolean;
+      status: number;
+      json: () => Promise<typeof adaReviews[number]>;
+    }>();
+    const updatedReview = {
+      id: 1,
+      professorId: 1,
+      rating: 3,
+      comment: "Comentário atualizado.",
+    };
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "PATCH") {
+        return patchResponse.promise;
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    const card = getFirstReviewCard();
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    fireEvent.change(card.getByLabelText("Nota"), { target: { value: "3" } });
+    fireEvent.change(card.getByLabelText("Comentário"), {
+      target: { value: "  Comentário atualizado.  " },
+    });
+    const saveButton = card.getByRole("button", { name: "Salvar alterações" });
+
+    act(() => {
+      saveButton.click();
+      saveButton.click();
+    });
+
+    expect(card.getByLabelText("Nota")).toBeDisabled();
+    expect(card.getByLabelText("Comentário")).toBeDisabled();
+    expect(card.getByRole("button", { name: "Salvando..." })).toBeDisabled();
+    expect(card.getByRole("button", { name: "Cancelar edição" })).toBeDisabled();
+    const patchCalls = fetchMock.mock.calls.filter(
+      ([url, options]) =>
+        url === "/api/professors/1/reviews/1" && options?.method === "PATCH",
+    );
+    expect(patchCalls).toHaveLength(1);
+    expect(patchCalls[0]?.[1]).toMatchObject({
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      signal: expect.any(AbortSignal),
+    });
+    expect(JSON.parse(String(patchCalls[0]?.[1]?.body))).toStrictEqual({
+      rating: 3,
+      comment: "  Comentário atualizado.  ",
+    });
+
+    patchResponse.resolve({ ok: true, status: 200, json: async () => updatedReview });
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Avaliação atualizada com sucesso.",
+    );
+    expect(screen.getByText("Comentário atualizado.")).toBeInTheDocument();
+    expect(screen.getByText("Nota: 3/5")).toBeInTheDocument();
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 3,5/5");
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, options]) =>
+          url === "/api/professors/1/reviews" && options?.method === undefined,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    ["400 response", () => Promise.resolve({ ok: false, status: 400 })],
+    ["404 response", () => Promise.resolve({ ok: false, status: 404 })],
+    ["500 response", () => Promise.resolve({ ok: false, status: 500 })],
+    ["network rejection", () => Promise.reject(new Error("Network error"))],
+  ])("shows an edit alert for a %s", async (_label, patchResult) => {
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "PATCH") {
+        return patchResult();
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    const card = getFirstReviewCard();
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(await card.findByRole("alert")).toHaveTextContent(
+      "Não foi possível editar a avaliação.",
+    );
+  });
+
+  it("clears an edit error when cancelling", async () => {
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "PATCH") {
+        return Promise.resolve({ ok: false, status: 400 });
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    const card = getFirstReviewCard();
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
+    expect(await card.findByRole("alert")).toBeInTheDocument();
+
+    fireEvent.click(card.getByRole("button", { name: "Cancelar edição" }));
+    expect(card.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("aborts a pending PATCH when unmounted", async () => {
+    const patchResponse = createDeferred<{ ok: boolean; status: number }>();
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (options?.method === "PATCH") {
+        return patchResponse.promise;
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const view = renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    const card = getFirstReviewCard();
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
+    const patchCall = fetchMock.mock.calls.find(([, options]) => options?.method === "PATCH");
+    const signal = patchCall?.[1]?.signal;
 
     expect(signal?.aborted).toBe(false);
     view.unmount();

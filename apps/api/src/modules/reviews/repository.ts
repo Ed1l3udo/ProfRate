@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "../../db/client.js";
 import { reviews } from "../../db/schema.js";
+import type { ReviewUpdate } from "./schemas.js";
 
 export async function listReviewsByProfessorId(professorId: number) {
   return db
@@ -56,4 +57,26 @@ export async function deleteReview({
     });
 
   return deletedReviews.at(0);
+}
+
+export async function updateReview({
+  professorId,
+  reviewId,
+  ...update
+}: {
+  professorId: number;
+  reviewId: number;
+} & ReviewUpdate) {
+  const updatedReviews = await db
+    .update(reviews)
+    .set(update)
+    .where(and(eq(reviews.id, reviewId), eq(reviews.professorId, professorId)))
+    .returning({
+      id: reviews.id,
+      professorId: reviews.professorId,
+      rating: reviews.rating,
+      comment: reviews.comment,
+    });
+
+  return updatedReviews.at(0);
 }

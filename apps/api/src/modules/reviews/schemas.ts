@@ -35,3 +35,20 @@ export const reviewNotFoundError = {
   code: "REVIEW_NOT_FOUND",
   message: "Review not found.",
 };
+
+export const invalidReviewUpdateError = {
+  code: "INVALID_REVIEW_UPDATE",
+  message: "Review update must include a valid rating or non-empty comment.",
+};
+
+export const updateReviewBodySchema = z
+  .object({
+    rating: z.number().int().min(1).max(5).optional(),
+    comment: z.string().trim().min(1).optional(),
+  })
+  .strict()
+  .refine(
+    (update) => update.rating !== undefined || update.comment !== undefined,
+  );
+
+export type ReviewUpdate = z.infer<typeof updateReviewBodySchema>;
