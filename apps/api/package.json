@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:check": "node --env-file=../../.env --import tsx src/db/check-connection.ts",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",

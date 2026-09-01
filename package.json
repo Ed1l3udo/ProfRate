@@ -9,6 +9,7 @@
   "scripts": {
     "typecheck": "pnpm --recursive --if-present typecheck",
     "test": "pnpm --recursive --if-present test",
+    "test:integration": "pnpm --filter @profrate/api test:integration",
     "build": "pnpm --recursive --if-present build",
     "check": "pnpm typecheck && pnpm test && pnpm build"
   }

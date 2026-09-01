@@ -21,5 +21,29 @@ services:
       retries: 10
       start_period: 5s
 
+  postgres-test:
+    profiles:
+      - integration
+    image: postgres:18.4
+    environment:
+      POSTGRES_USER: profrate_test
+      POSTGRES_PASSWORD: profrate_test_only
+      POSTGRES_DB: profrate_test
+      PGDATA: /var/lib/postgresql/18/docker
+    ports:
+      - "127.0.0.1:5433:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
 volumes:
   profrate_postgres_data:
