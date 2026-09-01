@@ -10,10 +10,7 @@ import {
   professorIdParamsSchema,
   professorNotFoundError,
 } from "./modules/professors/schemas.js";
-import type { findProfessorById as findProfessorByIdRepository } from "./modules/professors/repository.js";
-import type { listProfessors as listProfessorsRepository } from "./modules/professors/repository.js";
-import type { listReviewsByProfessorId as listReviewsByProfessorIdRepository } from "./modules/reviews/repository.js";
-import type { createReview as createReviewRepository } from "./modules/reviews/repository.js";
+import type { ProfessorsRepository } from "./modules/professors/repository.js";
 import {
   invalidReviewIdError,
   invalidJsonBodyError,
@@ -24,8 +21,7 @@ import {
   reviewNotFoundError,
   updateReviewBodySchema,
 } from "./modules/reviews/schemas.js";
-import type { deleteReview as deleteReviewRepository } from "./modules/reviews/repository.js";
-import type { updateReview as updateReviewRepository } from "./modules/reviews/repository.js";
+import type { ReviewsRepository } from "./modules/reviews/repository.js";
 
 function isJsonParsingError(error: unknown): error is SyntaxError & {
   status: number;
@@ -50,12 +46,12 @@ export function createApp({
   deleteReview,
   updateReview,
 }: {
-  createReview: typeof createReviewRepository;
-  findProfessorById: typeof findProfessorByIdRepository;
-  listProfessors: typeof listProfessorsRepository;
-  listReviewsByProfessorId: typeof listReviewsByProfessorIdRepository;
-  deleteReview: typeof deleteReviewRepository;
-  updateReview: typeof updateReviewRepository;
+  createReview: ReviewsRepository["createReview"];
+  findProfessorById: ProfessorsRepository["findProfessorById"];
+  listProfessors: ProfessorsRepository["listProfessors"];
+  listReviewsByProfessorId: ReviewsRepository["listReviewsByProfessorId"];
+  deleteReview: ReviewsRepository["deleteReview"];
+  updateReview: ReviewsRepository["updateReview"];
 }) {
   const app = express();
 
