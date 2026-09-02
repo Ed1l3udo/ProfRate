@@ -11,6 +11,7 @@ import { createProfessorsRepository } from "../../src/modules/professors/reposit
 import { createReviewsRepository } from "../../src/modules/reviews/repository.js";
 
 const integrationDatabaseName = "profrate_test";
+export const reviewFixtureTimestamp = new Date("2025-01-10T12:00:00.000Z");
 const migrationsFolder = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../drizzle",
@@ -186,16 +187,22 @@ export async function resetIntegrationDatabase(): Promise<void> {
       professorId: insertedProfessors[0].id,
       rating: 5,
       comment: "Primeira avaliação de teste.",
+      createdAt: reviewFixtureTimestamp,
+      updatedAt: reviewFixtureTimestamp,
     },
     {
       professorId: insertedProfessors[0].id,
       rating: 4,
       comment: "Segunda avaliação de teste.",
+      createdAt: reviewFixtureTimestamp,
+      updatedAt: reviewFixtureTimestamp,
     },
     {
       professorId: insertedProfessors[1].id,
       rating: 3,
       comment: "Terceira avaliação de teste.",
+      createdAt: reviewFixtureTimestamp,
+      updatedAt: reviewFixtureTimestamp,
     },
   ]);
 }

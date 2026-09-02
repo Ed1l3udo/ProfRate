@@ -11,6 +11,8 @@ describe("GET /health", () => {
         professorId: 0,
         rating: 1,
         comment: "",
+        createdAt: new Date("2025-01-10T12:00:00.000Z"),
+        updatedAt: new Date("2025-01-10T12:00:00.000Z"),
       }),
       deleteReview: async () => undefined,
       findProfessorById: async () => undefined,

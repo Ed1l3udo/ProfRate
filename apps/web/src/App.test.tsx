@@ -35,12 +35,16 @@ const adaReviews = [
     professorId: 1,
     rating: 5,
     comment: "Explicações claras e atividades bem organizadas.",
+    createdAt: "2025-01-10T12:00:00.000Z",
+    updatedAt: "2025-01-10T12:00:00.000Z",
   },
   {
     id: 2,
     professorId: 1,
     rating: 4,
     comment: "Feedbacks úteis durante os exercícios.",
+    createdAt: "2025-01-10T12:00:00.000Z",
+    updatedAt: "2025-01-10T12:00:00.000Z",
   },
 ];
 
@@ -387,6 +391,8 @@ describe("professor details", () => {
       professorId: 1,
       rating: 5,
       comment: "Comentário normalizado.",
+      createdAt: "2025-01-10T12:00:00.000Z",
+      updatedAt: "2025-01-10T12:00:00.000Z",
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {
@@ -451,6 +457,8 @@ describe("professor details", () => {
       professorId: 1,
       rating: 4,
       comment: "Primeira avaliação.",
+      createdAt: "2025-01-10T12:00:00.000Z",
+      updatedAt: "2025-01-10T12:00:00.000Z",
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {
@@ -846,6 +854,46 @@ describe("review deletion", () => {
   });
 });
 
+describe("review timestamps", () => {
+  it.each([
+    "2025-01-10T12:00:00.000Z",
+    "2025-01-09T12:00:00.000Z",
+  ])("shows creation in UTC and hides a non-later update (%s)", async (updatedAt) => {
+    vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => url === "/api/professors/1"
+        ? ada
+        : [{ ...adaReviews[0], updatedAt }],
+    })));
+
+    renderApp("/professors/1");
+
+    expect(await screen.findByText(/Criada em:/))
+      .toHaveTextContent("Criada em: 10/01/2025, 12:00 UTC");
+    expect(screen.getByText("10/01/2025, 12:00 UTC"))
+      .toHaveAttribute("datetime", adaReviews[0].createdAt);
+    expect(screen.queryByText(/Atualizada em:/)).not.toBeInTheDocument();
+  });
+
+  it("shows a later update in UTC", async () => {
+    vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => url === "/api/professors/1"
+        ? ada
+        : [{ ...adaReviews[0], updatedAt: "2025-01-11T14:30:00.000Z" }],
+    })));
+
+    renderApp("/professors/1");
+
+    expect(await screen.findByText(/Atualizada em:/))
+      .toHaveTextContent("Atualizada em: 11/01/2025, 14:30 UTC");
+    expect(screen.getByText(/Criada em:/))
+      .toHaveTextContent("Criada em: 10/01/2025, 12:00 UTC");
+  });
+});
+
 describe("review editing", () => {
   function getFirstReviewCard() {
     const card = screen
@@ -935,6 +983,8 @@ describe("review editing", () => {
       professorId: 1,
       rating: 3,
       comment: "Comentário atualizado.",
+      createdAt: "2025-01-10T12:00:00.000Z",
+      updatedAt: "2025-01-11T14:30:00.000Z",
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {
@@ -989,6 +1039,8 @@ describe("review editing", () => {
       "Avaliação atualizada com sucesso.",
     );
     expect(screen.getByText("Comentário atualizado.")).toBeInTheDocument();
+    expect(card.getByText(/Criada em:/)).toHaveTextContent("Criada em: 10/01/2025, 12:00 UTC");
+    expect(card.getByText(/Atualizada em:/)).toHaveTextContent("Atualizada em: 11/01/2025, 14:30 UTC");
     expect(screen.getByText("Nota: 3/5")).toBeInTheDocument();
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 3,5/5");
     expect(

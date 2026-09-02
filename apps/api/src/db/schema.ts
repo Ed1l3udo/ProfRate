@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, integer, pgTable, text } from "drizzle-orm/pg-core";
+import { check, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 export const professors = pgTable("professors", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -16,6 +16,12 @@ export const reviews = pgTable(
       .references(() => professors.id, { onDelete: "cascade" }),
     rating: integer("rating").notNull(),
     comment: text("comment").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     check("reviews_rating_between_1_and_5", sql`${table.rating} BETWEEN 1 AND 5`),

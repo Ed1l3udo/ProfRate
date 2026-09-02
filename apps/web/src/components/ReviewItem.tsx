@@ -4,6 +4,12 @@ import type { Review } from "../types/professor.js";
 
 type EditFeedback = "validation" | "success" | "error" | null;
 
+const reviewDateFormatter = new Intl.DateTimeFormat("pt-BR", {
+  dateStyle: "short",
+  timeStyle: "short",
+  timeZone: "UTC",
+});
+
 export function ReviewItem({
   professorId,
   review,
@@ -214,6 +220,18 @@ export function ReviewItem({
         <>
           <p className="review-rating">Nota: {review.rating}/5</p>
           <p className="review-comment">{review.comment}</p>
+          <p className="review-date">
+            Criada em: <time dateTime={review.createdAt}>
+              {reviewDateFormatter.format(new Date(review.createdAt))} UTC
+            </time>
+          </p>
+          {Date.parse(review.updatedAt) > Date.parse(review.createdAt) ? (
+            <p className="review-date">
+              Atualizada em: <time dateTime={review.updatedAt}>
+                {reviewDateFormatter.format(new Date(review.updatedAt))} UTC
+              </time>
+            </p>
+          ) : null}
         </>
       )}
       {!isEditing && !isConfirming ? (

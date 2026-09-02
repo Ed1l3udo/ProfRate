@@ -20,6 +20,8 @@ const testReview = {
   professorId: 0,
   rating: 1,
   comment: "",
+  createdAt: new Date("2025-01-10T12:00:00.000Z"),
+  updatedAt: new Date("2025-01-10T12:00:00.000Z"),
 };
 
 describe("GET /professors", () => {
@@ -204,12 +206,16 @@ describe("GET /professors/:id/reviews", () => {
         professorId: 1,
         rating: 5,
         comment: "Explicações claras e atividades bem organizadas.",
+        createdAt: testReview.createdAt,
+        updatedAt: testReview.updatedAt,
       },
       {
         id: 2,
         professorId: 1,
         rating: 4,
         comment: "Feedbacks úteis durante os exercícios.",
+        createdAt: testReview.createdAt,
+        updatedAt: testReview.updatedAt,
       },
     ];
     const findProfessorById = vi.fn().mockResolvedValue({
@@ -229,7 +235,11 @@ describe("GET /professors/:id/reviews", () => {
     const response = await request(app).get("/professors/1/reviews");
 
     expect(response.status).toBe(200);
-    expect(response.body).toStrictEqual(reviews);
+    expect(response.body).toStrictEqual(reviews.map((review) => ({
+      ...review,
+      createdAt: review.createdAt.toISOString(),
+      updatedAt: review.updatedAt.toISOString(),
+    })));
     expect(findProfessorById).toHaveBeenCalledOnce();
     expect(findProfessorById).toHaveBeenCalledWith(1);
     expect(listReviewsByProfessorId).toHaveBeenCalledOnce();
@@ -319,6 +329,8 @@ describe("POST /professors/:id/reviews", () => {
       professorId: 1,
       rating: 5,
       comment: "Explicações muito claras.",
+      createdAt: testReview.createdAt,
+      updatedAt: testReview.updatedAt,
     };
     const findProfessorById = vi.fn().mockResolvedValue({
       id: 1,
@@ -340,7 +352,11 @@ describe("POST /professors/:id/reviews", () => {
     });
 
     expect(response.status).toBe(201);
-    expect(response.body).toStrictEqual(createdReview);
+    expect(response.body).toStrictEqual({
+      ...createdReview,
+      createdAt: createdReview.createdAt.toISOString(),
+      updatedAt: createdReview.updatedAt.toISOString(),
+    });
     expect(findProfessorById).toHaveBeenCalledOnce();
     expect(findProfessorById).toHaveBeenCalledWith(1);
     expect(createReview).toHaveBeenCalledOnce();
@@ -419,6 +435,8 @@ describe("POST /professors/:id/reviews", () => {
     ["non-text comment", { rating: 5, comment: 123 }],
     ["missing comment", { rating: 5 }],
     ["extra property", { rating: 5, comment: "Comentário válido.", extra: true }],
+    ["createdAt property", { rating: 5, comment: "Comentário válido.", createdAt: "2025-01-10T12:00:00.000Z" }],
+    ["updatedAt property", { rating: 5, comment: "Comentário válido.", updatedAt: "2025-01-10T12:00:00.000Z" }],
   ])("returns 400 without querying repositories for %s", async (_name, body) => {
     const findProfessorById = vi.fn();
     const createReview = vi.fn();
@@ -490,6 +508,8 @@ describe("DELETE /professors/:professorId/reviews/:reviewId", () => {
       professorId: number;
       rating: number;
       comment: string;
+      createdAt: Date;
+      updatedAt: Date;
     } | undefined>,
   ) {
     return createApp({
@@ -508,6 +528,8 @@ describe("DELETE /professors/:professorId/reviews/:reviewId", () => {
       professorId: 1,
       rating: 5,
       comment: "Temporária",
+      createdAt: testReview.createdAt,
+      updatedAt: testReview.updatedAt,
     });
 
     const response = await request(
@@ -612,6 +634,8 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       professorId: 1,
       rating: 5,
       comment: "Comentário atualizado.",
+      createdAt: testReview.createdAt,
+      updatedAt: new Date("2025-01-11T14:30:00.000Z"),
     };
     const findProfessorById = vi.fn().mockResolvedValue(existingProfessor);
     const updateReview = vi.fn().mockResolvedValue(updatedReview);
@@ -620,7 +644,11 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       .send({ rating: 5, comment: "  Comentário atualizado.  " });
 
     expect(response.status).toBe(200);
-    expect(response.body).toStrictEqual(updatedReview);
+    expect(response.body).toStrictEqual({
+      ...updatedReview,
+      createdAt: updatedReview.createdAt.toISOString(),
+      updatedAt: updatedReview.updatedAt.toISOString(),
+    });
     expect(findProfessorById).toHaveBeenCalledWith(1);
     expect(updateReview).toHaveBeenCalledWith({
       professorId: 1,
@@ -636,6 +664,8 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       professorId: 1,
       rating: 3,
       comment: "Comentário existente.",
+      createdAt: testReview.createdAt,
+      updatedAt: new Date("2025-01-11T14:30:00.000Z"),
     });
     const response = await request(
       createUpdateApp(vi.fn().mockResolvedValue(existingProfessor), updateReview),
@@ -657,6 +687,8 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       professorId: 1,
       rating: 5,
       comment: "Somente comentário.",
+      createdAt: testReview.createdAt,
+      updatedAt: new Date("2025-01-11T14:30:00.000Z"),
     });
     const response = await request(
       createUpdateApp(vi.fn().mockResolvedValue(existingProfessor), updateReview),
@@ -682,6 +714,8 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     ["blank comment", { comment: "   " }],
     ["non-text comment", { comment: 123 }],
     ["extra property", { rating: 5, extra: true }],
+    ["createdAt property", { rating: 5, createdAt: "2025-01-10T12:00:00.000Z" }],
+    ["updatedAt property", { rating: 5, updatedAt: "2025-01-10T12:00:00.000Z" }],
   ])("rejects %s without querying repositories", async (_label, body) => {
     const findProfessorById = vi.fn();
     const updateReview = vi.fn();

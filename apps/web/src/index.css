@@ -210,6 +210,12 @@ h3 {
   margin: 0.35rem 0 0;
 }
 
+.review-date {
+  margin: 0.35rem 0 0;
+  color: #617286;
+  font-size: 0.875rem;
+}
+
 .review-delete-confirmation {
   display: flex;
   flex-wrap: wrap;

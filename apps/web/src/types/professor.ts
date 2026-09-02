@@ -13,4 +13,6 @@ export type Review = {
   professorId: number;
   rating: number;
   comment: string;
+  createdAt: string;
+  updatedAt: string;
 };

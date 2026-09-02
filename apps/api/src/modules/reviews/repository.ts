@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/database.js";
 import { reviews } from "../../db/schema.js";
@@ -12,6 +12,8 @@ export function createReviewsRepository(db: Database) {
         professorId: reviews.professorId,
         rating: reviews.rating,
         comment: reviews.comment,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
       })
       .from(reviews)
       .where(eq(reviews.professorId, professorId))
@@ -35,6 +37,8 @@ export function createReviewsRepository(db: Database) {
         professorId: reviews.professorId,
         rating: reviews.rating,
         comment: reviews.comment,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
       });
 
     return review;
@@ -55,6 +59,8 @@ export function createReviewsRepository(db: Database) {
         professorId: reviews.professorId,
         rating: reviews.rating,
         comment: reviews.comment,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
       });
 
     return deletedReviews.at(0);
@@ -70,13 +76,15 @@ export function createReviewsRepository(db: Database) {
   } & ReviewUpdate) {
     const updatedReviews = await db
       .update(reviews)
-      .set(update)
+      .set({ ...update, updatedAt: sql`now()` })
       .where(and(eq(reviews.id, reviewId), eq(reviews.professorId, professorId)))
       .returning({
         id: reviews.id,
         professorId: reviews.professorId,
         rating: reviews.rating,
         comment: reviews.comment,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
       });
 
     return updatedReviews.at(0);

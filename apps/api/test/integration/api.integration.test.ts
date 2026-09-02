@@ -2,7 +2,9 @@ import request from "supertest";
 import { expect, it } from "vitest";
 
 import { createApp } from "../../src/app.js";
-import { getIntegrationContext } from "./database.js";
+import { getIntegrationContext, reviewFixtureTimestamp } from "./database.js";
+
+const isoUtcTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 it("persists the essential review lifecycle through the HTTP API", async () => {
   const { professorsRepository, reviewsRepository } = getIntegrationContext();
@@ -30,7 +32,10 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     professorId: 1,
     rating: 2,
     comment: "Avaliação do fluxo HTTP.",
+    createdAt: expect.stringMatching(isoUtcTimestamp),
+    updatedAt: expect.stringMatching(isoUtcTimestamp),
   });
+  expect(createResponse.body.updatedAt).toBe(createResponse.body.createdAt);
 
   const afterCreateResponse = await request(app).get(
     "/professors/1/reviews",
@@ -49,6 +54,8 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     professorId: 1,
     rating: 5,
     comment: "Avaliação atualizada.",
+    createdAt: createResponse.body.createdAt,
+    updatedAt: expect.stringMatching(isoUtcTimestamp),
   });
 
   const afterUpdateResponse = await request(app).get(
@@ -73,4 +80,21 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
   expect(afterDeleteResponse.status).toBe(200);
   expect(afterDeleteResponse.body).not.toContainEqual(updateResponse.body);
   expect(afterDeleteResponse.body).toHaveLength(2);
+});
+
+it("preserves creation and advances the fixed fixture timestamp on PATCH", async () => {
+  const { professorsRepository, reviewsRepository } = getIntegrationContext();
+  const app = createApp({ ...professorsRepository, ...reviewsRepository });
+  const response = await request(app)
+    .patch("/professors/1/reviews/1")
+    .send({ comment: "Fixture editada pelo HTTP." });
+
+  expect(response.status).toBe(200);
+  expect(response.body.createdAt).toBe(reviewFixtureTimestamp.toISOString());
+  expect(response.body.updatedAt).toMatch(isoUtcTimestamp);
+  expect(Date.parse(response.body.updatedAt)).toBeGreaterThan(reviewFixtureTimestamp.getTime());
+
+  const listResponse = await request(app).get("/professors/1/reviews");
+  expect(listResponse.status).toBe(200);
+  expect(listResponse.body).toContainEqual(response.body);
 });

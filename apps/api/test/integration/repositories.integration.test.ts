@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 
 import { reviews } from "../../src/db/schema.js";
-import { getIntegrationContext } from "./database.js";
+import { getIntegrationContext, reviewFixtureTimestamp } from "./database.js";
 
 function sqlStateFrom(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null) {
@@ -33,6 +33,27 @@ async function expectSqlState(
 
   expect(sqlStateFrom(capturedError)).toBe(expectedCode);
 }
+
+it("has required timestamptz columns with database defaults after migrations", async () => {
+  const { database } = getIntegrationContext();
+  const result = await database.pool.query<{
+    column_name: string;
+    data_type: string;
+    is_nullable: string;
+    column_default: string;
+  }>(`
+    SELECT column_name, data_type, is_nullable, column_default
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'reviews'
+      AND column_name IN ('created_at', 'updated_at')
+    ORDER BY column_name
+  `);
+
+  expect(result.rows).toStrictEqual([
+    { column_name: "created_at", data_type: "timestamp with time zone", is_nullable: "NO", column_default: "now()" },
+    { column_name: "updated_at", data_type: "timestamp with time zone", is_nullable: "NO", column_default: "now()" },
+  ]);
+});
 
 it("lists professors ordered by id", async () => {
   const { professorsRepository } = getIntegrationContext();
@@ -86,12 +107,16 @@ it("lists reviews ordered by id", async () => {
       professorId: 1,
       rating: 5,
       comment: "Primeira avaliação de teste.",
+      createdAt: reviewFixtureTimestamp,
+      updatedAt: reviewFixtureTimestamp,
     },
     {
       id: 2,
       professorId: 1,
       rating: 4,
       comment: "Segunda avaliação de teste.",
+      createdAt: reviewFixtureTimestamp,
+      updatedAt: reviewFixtureTimestamp,
     },
   ]);
 });
@@ -99,35 +124,46 @@ it("lists reviews ordered by id", async () => {
 it("creates a review and returns the persisted columns", async () => {
   const { reviewsRepository } = getIntegrationContext();
 
-  await expect(
-    reviewsRepository.createReview({
-      professorId: 3,
-      rating: 2,
-      comment: "Avaliação criada no teste.",
-    }),
-  ).resolves.toStrictEqual({
-    id: 4,
+  const review = await reviewsRepository.createReview({
     professorId: 3,
     rating: 2,
     comment: "Avaliação criada no teste.",
   });
+
+  expect(review).toStrictEqual({
+    id: 4,
+    professorId: 3,
+    rating: 2,
+    comment: "Avaliação criada no teste.",
+    createdAt: expect.any(Date),
+    updatedAt: expect.any(Date),
+  });
+  expect(Number.isFinite(review.createdAt.getTime())).toBe(true);
+  expect(review.updatedAt.getTime()).toBe(review.createdAt.getTime());
+  await expect(reviewsRepository.listReviewsByProfessorId(3))
+    .resolves.toStrictEqual([review]);
 });
 
 it("partially updates a review", async () => {
   const { reviewsRepository } = getIntegrationContext();
 
-  await expect(
-    reviewsRepository.updateReview({
-      professorId: 1,
-      reviewId: 1,
-      rating: 2,
-    }),
-  ).resolves.toStrictEqual({
+  const review = await reviewsRepository.updateReview({
+    professorId: 1,
+    reviewId: 1,
+    rating: 2,
+  });
+
+  expect(review).toStrictEqual({
     id: 1,
     professorId: 1,
     rating: 2,
     comment: "Primeira avaliação de teste.",
+    createdAt: reviewFixtureTimestamp,
+    updatedAt: expect.any(Date),
   });
+  expect(review?.updatedAt.getTime()).toBeGreaterThan(reviewFixtureTimestamp.getTime());
+  await expect(reviewsRepository.listReviewsByProfessorId(1))
+    .resolves.toContainEqual(review);
 });
 
 it("does not update a review through another professor", async () => {
@@ -147,6 +183,8 @@ it("does not update a review through another professor", async () => {
     professorId: 1,
     rating: 5,
     comment: "Primeira avaliação de teste.",
+    createdAt: reviewFixtureTimestamp,
+    updatedAt: reviewFixtureTimestamp,
   });
 });
 
@@ -160,6 +198,8 @@ it("deletes a review", async () => {
     professorId: 1,
     rating: 5,
     comment: "Primeira avaliação de teste.",
+    createdAt: reviewFixtureTimestamp,
+    updatedAt: reviewFixtureTimestamp,
   });
   await expect(
     reviewsRepository.listReviewsByProfessorId(1),
@@ -179,6 +219,8 @@ it("does not delete a review through another professor", async () => {
     professorId: 1,
     rating: 5,
     comment: "Primeira avaliação de teste.",
+    createdAt: reviewFixtureTimestamp,
+    updatedAt: reviewFixtureTimestamp,
   });
 });
 
