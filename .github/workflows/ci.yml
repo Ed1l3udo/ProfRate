@@ -33,3 +33,42 @@ jobs:
 
       - name: Run checks
         run: pnpm check
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_USER: profrate_test
+          POSTGRES_PASSWORD: profrate_test_only
+          POSTGRES_DB: profrate_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U profrate_test -d profrate_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm and Node.js
+        uses: pnpm/setup@v1
+        with:
+          version: 11.21.0
+          runtime: node@24
+          cache: true
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run PostgreSQL integration tests
+        env:
+          INTEGRATION_DATABASE_URL: postgresql://profrate_test:profrate_test_only@127.0.0.1:${{ job.services.postgres.ports[5432] }}/profrate_test
+        run: pnpm test:integration
