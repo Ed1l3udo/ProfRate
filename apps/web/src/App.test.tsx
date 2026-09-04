@@ -3,7 +3,9 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { MemoryRouter } from "react-router";
 
 import { App } from "./App.js";
+import { ProfessorReviews } from "./components/ProfessorReviews.js";
 import { ProfessorDetailsPage } from "./pages/ProfessorDetailsPage.js";
+import type { Review } from "./types/professor.js";
 
 function renderApp(initialEntry: string) {
   return render(
@@ -47,6 +49,98 @@ const adaReviews = [
     updatedAt: "2025-01-10T12:00:00.000Z",
   },
 ];
+
+const orderedReviews: Review[] = [
+  {
+    id: 1,
+    professorId: 1,
+    rating: 3,
+    comment: "Nota três mais antiga.",
+    createdAt: "2025-01-01T12:00:00.000Z",
+    updatedAt: "2025-01-01T12:00:00.000Z",
+  },
+  {
+    id: 2,
+    professorId: 1,
+    rating: 5,
+    comment: "Nota cinco recente de id menor.",
+    createdAt: "2025-01-03T12:00:00.000Z",
+    updatedAt: "2025-01-03T12:00:00.000Z",
+  },
+  {
+    id: 3,
+    professorId: 1,
+    rating: 5,
+    comment: "Nota cinco recente de id maior.",
+    createdAt: "2025-01-03T12:00:00.000Z",
+    updatedAt: "2025-01-03T12:00:00.000Z",
+  },
+  {
+    id: 4,
+    professorId: 1,
+    rating: 1,
+    comment: "Nota um de id menor.",
+    createdAt: "2025-01-02T12:00:00.000Z",
+    updatedAt: "2025-01-02T12:00:00.000Z",
+  },
+  {
+    id: 5,
+    professorId: 1,
+    rating: 1,
+    comment: "Nota um de id maior.",
+    createdAt: "2025-01-02T12:00:00.000Z",
+    updatedAt: "2025-01-02T12:00:00.000Z",
+  },
+  {
+    id: 6,
+    professorId: 1,
+    rating: 5,
+    comment: "Nota cinco antiga.",
+    createdAt: "2024-12-31T12:00:00.000Z",
+    updatedAt: "2024-12-31T12:00:00.000Z",
+  },
+  {
+    id: 7,
+    professorId: 1,
+    rating: 2,
+    comment: "Nota dois.",
+    createdAt: "2025-01-02T10:00:00.000Z",
+    updatedAt: "2025-01-02T10:00:00.000Z",
+  },
+  {
+    id: 8,
+    professorId: 1,
+    rating: 4,
+    comment: "Nota quatro.",
+    createdAt: "2025-01-02T11:00:00.000Z",
+    updatedAt: "2025-01-02T11:00:00.000Z",
+  },
+];
+
+function stubReviewsFetch(reviews: Review[]) {
+  const fetchMock = vi.fn((url: string) => {
+    if (url === "/api/professors/1") {
+      return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+    }
+
+    if (url === "/api/professors/1/reviews") {
+      return Promise.resolve({ ok: true, status: 200, json: async () => reviews });
+    }
+
+    throw new Error(`Unexpected URL: ${url}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function expectReviewOrder(comments: string[]) {
+  const items = within(screen.getByRole("list")).getAllByRole("listitem");
+
+  expect(items).toHaveLength(comments.length);
+  comments.forEach((comment, index) => {
+    expect(within(items[index]).getByText(comment)).toBeInTheDocument();
+  });
+}
 
 afterEach(() => {
   cleanup();
@@ -661,6 +755,373 @@ describe("professor details", () => {
   });
 });
 
+describe("review filtering and ordering", () => {
+  it("starts with newest reviews and resolves equal dates by descending id", async () => {
+    stubReviewsFetch(orderedReviews);
+
+    renderApp("/professors/1");
+    await screen.findByText("Nota cinco recente de id maior.");
+
+    expect(screen.getByLabelText("Ordenar avaliações")).toHaveValue("newest");
+    expectReviewOrder([
+      "Nota cinco recente de id maior.",
+      "Nota cinco recente de id menor.",
+      "Nota um de id maior.",
+      "Nota um de id menor.",
+      "Nota quatro.",
+      "Nota dois.",
+      "Nota três mais antiga.",
+      "Nota cinco antiga.",
+    ]);
+  });
+
+  it("orders oldest reviews by ascending date", async () => {
+    stubReviewsFetch(orderedReviews);
+    renderApp("/professors/1");
+    await screen.findByText("Nota cinco recente de id maior.");
+
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "oldest" },
+    });
+
+    expectReviewOrder([
+      "Nota cinco antiga.",
+      "Nota três mais antiga.",
+      "Nota dois.",
+      "Nota quatro.",
+      "Nota um de id menor.",
+      "Nota um de id maior.",
+      "Nota cinco recente de id menor.",
+      "Nota cinco recente de id maior.",
+    ]);
+  });
+
+  it("resolves equal dates in oldest order by ascending id", async () => {
+    stubReviewsFetch([orderedReviews[4], orderedReviews[3]]);
+    renderApp("/professors/1");
+    await screen.findByText("Nota um de id maior.");
+
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "oldest" },
+    });
+
+    expectReviewOrder(["Nota um de id menor.", "Nota um de id maior."]);
+  });
+
+  it("orders by highest rating with date and id as deterministic tiebreakers", async () => {
+    stubReviewsFetch(orderedReviews);
+    renderApp("/professors/1");
+    await screen.findByText("Nota cinco recente de id maior.");
+
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "highest-rating" },
+    });
+
+    expectReviewOrder([
+      "Nota cinco recente de id maior.",
+      "Nota cinco recente de id menor.",
+      "Nota cinco antiga.",
+      "Nota quatro.",
+      "Nota três mais antiga.",
+      "Nota dois.",
+      "Nota um de id maior.",
+      "Nota um de id menor.",
+    ]);
+  });
+
+  it("orders by lowest rating with date and id as deterministic tiebreakers", async () => {
+    stubReviewsFetch(orderedReviews);
+    renderApp("/professors/1");
+    await screen.findByText("Nota cinco recente de id maior.");
+
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "lowest-rating" },
+    });
+
+    expectReviewOrder([
+      "Nota um de id maior.",
+      "Nota um de id menor.",
+      "Nota dois.",
+      "Nota três mais antiga.",
+      "Nota quatro.",
+      "Nota cinco recente de id maior.",
+      "Nota cinco recente de id menor.",
+      "Nota cinco antiga.",
+    ]);
+  });
+
+  it.each([
+    ["1", ["Nota um de id maior.", "Nota um de id menor."]],
+    ["2", ["Nota dois."]],
+    ["3", ["Nota três mais antiga."]],
+    ["4", ["Nota quatro."]],
+    ["5", [
+      "Nota cinco recente de id maior.",
+      "Nota cinco recente de id menor.",
+      "Nota cinco antiga.",
+    ]],
+  ])("filters rating %s locally", async (rating, comments) => {
+    stubReviewsFetch(orderedReviews);
+    renderApp("/professors/1");
+    await screen.findByText("Nota cinco recente de id maior.");
+
+    fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
+      target: { value: rating },
+    });
+
+    expectReviewOrder(comments);
+  });
+
+  it("distinguishes a filter without matches from an empty API response", async () => {
+    stubReviewsFetch(adaReviews);
+    const firstView = renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+
+    fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
+      target: { value: "1" },
+    });
+
+    expect(screen.getByText("Nenhuma avaliação corresponde ao filtro.")).toBeInTheDocument();
+    expect(screen.queryByText("Nenhuma avaliação ainda.")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nova avaliação" })).toBeInTheDocument();
+
+    firstView.unmount();
+    cleanup();
+    stubReviewsFetch([]);
+    renderApp("/professors/1");
+
+    expect(await screen.findByText("Nenhuma avaliação ainda.")).toBeInTheDocument();
+    expect(screen.queryByText("Nenhuma avaliação corresponde ao filtro.")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Filtrar por nota")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nova avaliação" })).toBeInTheDocument();
+  });
+
+  it("keeps the general summary unchanged after filtering", async () => {
+    stubReviewsFetch(orderedReviews);
+    renderApp("/professors/1");
+    await screen.findByText("Nota cinco recente de id maior.");
+    const summary = screen.getByLabelText("Resumo das avaliações");
+
+    expect(summary).toHaveTextContent("Resumo geral");
+    expect(summary).toHaveTextContent("8 avaliações");
+    expect(summary).toHaveTextContent("Média: 3,3/5");
+
+    fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
+      target: { value: "5" },
+    });
+
+    expect(summary).toHaveTextContent("8 avaliações");
+    expect(summary).toHaveTextContent("Média: 3,3/5");
+  });
+
+  it("offers accessible options and changes both controls without fetching", async () => {
+    const fetchMock = stubReviewsFetch(adaReviews);
+    renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+    const filter = screen.getByLabelText("Filtrar por nota");
+    const order = screen.getByLabelText("Ordenar avaliações");
+
+    expect(within(filter).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Todas as notas",
+      "Nota 5",
+      "Nota 4",
+      "Nota 3",
+      "Nota 2",
+      "Nota 1",
+    ]);
+    expect(within(order).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Mais recentes",
+      "Mais antigas",
+      "Maior nota",
+      "Menor nota",
+    ]);
+
+    fireEvent.change(filter, { target: { value: "4" } });
+    fireEvent.change(order, { target: { value: "oldest" } });
+
+    expect(filter).toHaveValue("4");
+    expect(order).toHaveValue("oldest");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets only the filter after creation and preserves the selected order", async () => {
+    const createdReview = {
+      id: 3,
+      professorId: 1,
+      rating: 3,
+      comment: "Avaliação recém-criada.",
+      createdAt: "2025-01-11T12:00:00.000Z",
+      updatedAt: "2025-01-11T12:00:00.000Z",
+    };
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+      if (options?.method === "POST") {
+        return Promise.resolve({ ok: true, status: 201, json: async () => createdReview });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/professors/1");
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+
+    fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
+      target: { value: "1" },
+    });
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "oldest" },
+    });
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Comentário"), {
+      target: { value: "Avaliação recém-criada." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
+
+    expect(await screen.findByText("Avaliação recém-criada.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filtrar por nota")).toHaveValue("all");
+    expect(screen.getByLabelText("Ordenar avaliações")).toHaveValue("oldest");
+    expectReviewOrder([
+      "Explicações claras e atividades bem organizadas.",
+      "Feedbacks úteis durante os exercícios.",
+      "Avaliação recém-criada.",
+    ]);
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, options]) => url === "/api/professors/1/reviews" && options?.method === undefined,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("resets only the filter after editing and preserves the selected order", async () => {
+    const updatedReview = {
+      ...adaReviews[0],
+      rating: 3,
+      comment: "Avaliação com nota editada.",
+      updatedAt: "2025-01-11T14:30:00.000Z",
+    };
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+      if (options?.method === "PATCH") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => updatedReview });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+
+    fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "oldest" },
+    });
+    const targetCard = screen
+      .getByText("Explicações claras e atividades bem organizadas.")
+      .closest("li");
+    if (targetCard === null) {
+      throw new Error("Review card not found");
+    }
+    const card = within(targetCard);
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    fireEvent.change(card.getByLabelText("Nota"), { target: { value: "3" } });
+    fireEvent.change(card.getByLabelText("Comentário"), {
+      target: { value: "Avaliação com nota editada." },
+    });
+    fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Avaliação atualizada com sucesso.",
+    );
+    expect(screen.getByText("Avaliação com nota editada.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filtrar por nota")).toHaveValue("all");
+    expect(screen.getByLabelText("Ordenar avaliações")).toHaveValue("oldest");
+    expectReviewOrder([
+      "Avaliação com nota editada.",
+      "Feedbacks úteis durante os exercícios.",
+    ]);
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, options]) => url === "/api/professors/1/reviews" && options?.method === undefined,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("preserves filter and order after deletion and shows the filtered empty state", async () => {
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+      if (options?.method === "DELETE") {
+        return Promise.resolve({ ok: true, status: 204 });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+
+    fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "oldest" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Excluir avaliação" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar exclusão" }));
+
+    expect(
+      await screen.findByText("Nenhuma avaliação corresponde ao filtro."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Filtrar por nota")).toHaveValue("5");
+    expect(screen.getByLabelText("Ordenar avaliações")).toHaveValue("oldest");
+    expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("1 avaliação");
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, options]) => url === "/api/professors/1/reviews" && options?.method === undefined,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("restores the initial controls when professorId changes", async () => {
+    const secondProfessorReview = {
+      ...adaReviews[0],
+      id: 9,
+      professorId: 2,
+      comment: "Avaliação do segundo professor.",
+    };
+    const fetchMock = vi.fn((url: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => url === "/api/professors/1/reviews"
+        ? adaReviews
+        : [secondProfessorReview],
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(<ProfessorReviews professorId={1} />);
+    await screen.findByText("Feedbacks úteis durante os exercícios.");
+
+    fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
+      target: { value: "4" },
+    });
+    fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
+      target: { value: "oldest" },
+    });
+    view.rerender(<ProfessorReviews professorId={2} />);
+
+    expect(await screen.findByText("Avaliação do segundo professor.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filtrar por nota")).toHaveValue("all");
+    expect(screen.getByLabelText("Ordenar avaliações")).toHaveValue("newest");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/professors/1/reviews",
+      "/api/professors/2/reviews",
+    ]);
+  });
+});
+
 describe("review deletion", () => {
   it("opens confirmation and cancelling does not call DELETE", async () => {
     const fetchMock = vi.fn((url: string, _options?: RequestInit) => {
@@ -708,7 +1169,13 @@ describe("review deletion", () => {
 
     renderApp("/professors/1");
     await screen.findByText("Feedbacks úteis durante os exercícios.");
-    fireEvent.click(screen.getAllByRole("button", { name: "Excluir avaliação" })[0]);
+    const targetCard = screen
+      .getByText("Explicações claras e atividades bem organizadas.")
+      .closest("li");
+    if (targetCard === null) {
+      throw new Error("Review card not found");
+    }
+    fireEvent.click(within(targetCard).getByRole("button", { name: "Excluir avaliação" }));
     const confirmButton = screen.getByRole("button", { name: "Confirmar exclusão" });
 
     act(() => {
