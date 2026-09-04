@@ -1,9 +1,19 @@
 import { z } from "zod";
 
+export const REVIEW_COMMENT_MAX_LENGTH = 500;
+
+const reviewCommentSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(
+    (comment) => Array.from(comment).length <= REVIEW_COMMENT_MAX_LENGTH,
+  );
+
 export const invalidReviewInputError = {
   code: "INVALID_REVIEW_INPUT",
   message:
-    "Review body must include an integer rating from 1 to 5 and a non-empty comment.",
+    "Review body must include an integer rating from 1 to 5 and a non-empty comment of at most 500 characters.",
 };
 
 export const invalidJsonBodyError = {
@@ -14,7 +24,7 @@ export const invalidJsonBodyError = {
 export const createReviewBodySchema = z
   .object({
     rating: z.number().int().min(1).max(5),
-    comment: z.string().trim().min(1),
+    comment: reviewCommentSchema,
   })
   .strict();
 
@@ -38,13 +48,14 @@ export const reviewNotFoundError = {
 
 export const invalidReviewUpdateError = {
   code: "INVALID_REVIEW_UPDATE",
-  message: "Review update must include a valid rating or non-empty comment.",
+  message:
+    "Review update must contain only valid fields and include an integer rating from 1 to 5 and/or a non-empty comment of at most 500 characters.",
 };
 
 export const updateReviewBodySchema = z
   .object({
     rating: z.number().int().min(1).max(5).optional(),
-    comment: z.string().trim().min(1).optional(),
+    comment: reviewCommentSchema.optional(),
   })
   .strict()
   .refine(

@@ -348,6 +348,23 @@ h3 {
   resize: vertical;
 }
 
+.review-character-count {
+  margin: -0.15rem 0 0;
+  color: #617286;
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.review-character-count-attention {
+  color: #8a5a00;
+  font-weight: 700;
+}
+
+.review-character-count-exceeded {
+  color: #a12622;
+  font-weight: 700;
+}
+
 .review-submit {
   justify-self: start;
   margin-top: 0.35rem;

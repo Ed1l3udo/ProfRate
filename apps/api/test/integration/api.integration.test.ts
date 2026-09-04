@@ -98,3 +98,36 @@ it("preserves creation and advances the fixed fixture timestamp on PATCH", async
   expect(listResponse.status).toBe(200);
   expect(listResponse.body).toContainEqual(response.body);
 });
+
+it("enforces the 500-code-point comment limit through POST and PATCH", async () => {
+  const { professorsRepository, reviewsRepository } = getIntegrationContext();
+  const app = createApp({ ...professorsRepository, ...reviewsRepository });
+  const emojiComment = "🙂".repeat(500);
+  const createResponse = await request(app)
+    .post("/professors/1/reviews")
+    .send({ rating: 5, comment: emojiComment });
+
+  expect(createResponse.status).toBe(201);
+  expect(Array.from(createResponse.body.comment)).toHaveLength(500);
+
+  const rejectedCreateResponse = await request(app)
+    .post("/professors/1/reviews")
+    .send({ rating: 5, comment: "a".repeat(501) });
+
+  expect(rejectedCreateResponse.status).toBe(400);
+  expect(rejectedCreateResponse.body.error.code).toBe("INVALID_REVIEW_INPUT");
+
+  const updateResponse = await request(app)
+    .patch(`/professors/1/reviews/${createResponse.body.id}`)
+    .send({ comment: "a".repeat(500) });
+
+  expect(updateResponse.status).toBe(200);
+  expect(Array.from(updateResponse.body.comment)).toHaveLength(500);
+
+  const rejectedUpdateResponse = await request(app)
+    .patch(`/professors/1/reviews/${createResponse.body.id}`)
+    .send({ comment: "🙂".repeat(501) });
+
+  expect(rejectedUpdateResponse.status).toBe(400);
+  expect(rejectedUpdateResponse.body.error.code).toBe("INVALID_REVIEW_UPDATE");
+});

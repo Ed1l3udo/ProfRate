@@ -3,17 +3,22 @@ import { expect, it } from "vitest";
 import { reviews } from "../../src/db/schema.js";
 import { getIntegrationContext, reviewFixtureTimestamp } from "./database.js";
 
-function sqlStateFrom(error: unknown): string | undefined {
+function databaseErrorFieldFrom(
+  error: unknown,
+  field: "code" | "constraint",
+): string | undefined {
   if (typeof error !== "object" || error === null) {
     return undefined;
   }
 
-  if ("code" in error && typeof error.code === "string") {
-    return error.code;
+  const databaseError = error as Record<string, unknown>;
+
+  if (typeof databaseError[field] === "string") {
+    return databaseError[field];
   }
 
-  if ("cause" in error) {
-    return sqlStateFrom(error.cause);
+  if ("cause" in databaseError) {
+    return databaseErrorFieldFrom(databaseError.cause, field);
   }
 
   return undefined;
@@ -31,7 +36,17 @@ async function expectSqlState(
     capturedError = error;
   }
 
-  expect(sqlStateFrom(capturedError)).toBe(expectedCode);
+  expect(databaseErrorFieldFrom(capturedError, "code")).toBe(expectedCode);
+}
+
+async function captureDatabaseError(operation: () => Promise<unknown>) {
+  try {
+    await operation();
+  } catch (error) {
+    return error;
+  }
+
+  throw new Error("Expected database operation to fail");
 }
 
 it("has required timestamptz columns with database defaults after migrations", async () => {
@@ -52,6 +67,25 @@ it("has required timestamptz columns with database defaults after migrations", a
   expect(result.rows).toStrictEqual([
     { column_name: "created_at", data_type: "timestamp with time zone", is_nullable: "NO", column_default: "now()" },
     { column_name: "updated_at", data_type: "timestamp with time zone", is_nullable: "NO", column_default: "now()" },
+  ]);
+});
+
+it("has the explicit 500-character comment check constraint", async () => {
+  const { database } = getIntegrationContext();
+  const result = await database.pool.query<{
+    constraint_name: string;
+    definition: string;
+  }>(`
+    SELECT conname AS constraint_name, pg_get_constraintdef(oid) AS definition
+    FROM pg_constraint
+    WHERE conname = 'reviews_comment_max_500'
+  `);
+
+  expect(result.rows).toStrictEqual([
+    {
+      constraint_name: "reviews_comment_max_500",
+      definition: expect.stringContaining("char_length(comment) <= 500"),
+    },
   ]);
 });
 
@@ -142,6 +176,39 @@ it("creates a review and returns the persisted columns", async () => {
   expect(review.updatedAt.getTime()).toBe(review.createdAt.getTime());
   await expect(reviewsRepository.listReviewsByProfessorId(3))
     .resolves.toStrictEqual([review]);
+});
+
+it("persists exactly 500 comment code points through the repository", async () => {
+  const { database, reviewsRepository } = getIntegrationContext();
+  const comment = "🙂".repeat(500);
+  const review = await reviewsRepository.createReview({
+    professorId: 3,
+    rating: 5,
+    comment,
+  });
+  const result = await database.pool.query<{ character_count: number }>(
+    "SELECT char_length(comment)::integer AS character_count FROM reviews WHERE id = $1",
+    [review.id],
+  );
+
+  expect(review.comment).toBe(comment);
+  expect(Array.from(review.comment)).toHaveLength(500);
+  expect(result.rows).toStrictEqual([{ character_count: 500 }]);
+});
+
+it.each([
+  ["text", "a".repeat(501)],
+  ["emoji", "🙂".repeat(501)],
+])("rejects 501 %s code points through the named database constraint", async (_label, comment) => {
+  const { database } = getIntegrationContext();
+  const error = await captureDatabaseError(() =>
+    database.db.insert(reviews).values({ professorId: 1, rating: 5, comment }),
+  );
+
+  expect(databaseErrorFieldFrom(error, "code")).toBe("23514");
+  expect(databaseErrorFieldFrom(error, "constraint")).toBe(
+    "reviews_comment_max_500",
+  );
 });
 
 it("partially updates a review", async () => {

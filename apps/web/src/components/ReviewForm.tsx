@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Review } from "../types/professor.js";
+import {
+  countReviewCommentCharacters,
+  REVIEW_COMMENT_MAX_LENGTH,
+} from "../reviewComment.js";
 
-type Feedback = "validation" | "success" | "error" | null;
+type Feedback = "validation" | "length" | "success" | "error" | null;
 
 export function ReviewForm({
   professorId,
@@ -27,6 +31,7 @@ export function ReviewForm({
     event.preventDefault();
 
     const numericRating = Number(rating);
+    const commentLength = countReviewCommentCharacters(comment);
     if (
       rating === "" ||
       !Number.isInteger(numericRating) ||
@@ -35,6 +40,11 @@ export function ReviewForm({
       comment.trim().length === 0
     ) {
       setFeedback("validation");
+      return;
+    }
+
+    if (commentLength > REVIEW_COMMENT_MAX_LENGTH) {
+      setFeedback("length");
       return;
     }
 
@@ -86,6 +96,14 @@ export function ReviewForm({
     }
   }
 
+  const commentLength = countReviewCommentCharacters(comment);
+  const commentCountClassName =
+    commentLength > REVIEW_COMMENT_MAX_LENGTH
+      ? "review-character-count review-character-count-exceeded"
+      : commentLength >= 450
+        ? "review-character-count review-character-count-attention"
+        : "review-character-count";
+
   return (
     <form className="review-form" noValidate onSubmit={handleSubmit}>
       <h3>Nova avaliação</h3>
@@ -107,17 +125,26 @@ export function ReviewForm({
       <textarea
         className="review-input review-textarea"
         id="review-comment"
+        aria-describedby="review-comment-count"
         value={comment}
         onChange={(event) => {
           setComment(event.target.value);
           setFeedback(null);
         }}
       />
+      <p className={commentCountClassName} id="review-comment-count">
+        {commentLength}/{REVIEW_COMMENT_MAX_LENGTH} caracteres
+      </p>
       <button className="review-submit" type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Enviando..." : "Enviar avaliação"}
       </button>
       {feedback === "validation" ? (
         <p className="form-feedback" role="alert">Preencha uma nota de 1 a 5 e um comentário.</p>
+      ) : null}
+      {feedback === "length" ? (
+        <p className="form-feedback" role="alert">
+          O comentário deve ter no máximo 500 caracteres.
+        </p>
       ) : null}
       {feedback === "success" ? (
         <p className="form-feedback" role="status">Avaliação enviada com sucesso.</p>

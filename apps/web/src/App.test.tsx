@@ -410,6 +410,9 @@ describe("professor details", () => {
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("2 avaliações");
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 4,5/5");
     expect(screen.getByRole("heading", { name: "Nova avaliação" })).toBeInTheDocument();
+    const creationComment = screen.getByLabelText("Comentário");
+    expect(creationComment).toHaveAttribute("aria-describedby", "review-comment-count");
+    expect(screen.getByText("0/500 caracteres")).not.toHaveAttribute("aria-live");
     expect(screen.getByText("Nota: 4/5")).toBeInTheDocument();
     expect(
       screen.getByText("Explicações claras e atividades bem organizadas."),
@@ -581,6 +584,68 @@ describe("professor details", () => {
 
     expect(await screen.findByText("Primeira avaliação.")).toBeInTheDocument();
     expect(screen.queryByText("Nenhuma avaliação ainda.")).not.toBeInTheDocument();
+  });
+
+  it("counts trimmed Unicode code points and styles the creation counter", async () => {
+    stubReviewsFetch(adaReviews);
+    renderApp("/professors/1");
+    await screen.findByRole("heading", { name: "Nova avaliação" });
+    const comment = screen.getByLabelText("Comentário");
+
+    fireEvent.change(comment, { target: { value: "  🙂  " } });
+    expect(screen.getByText("1/500 caracteres")).toHaveClass("review-character-count");
+
+    fireEvent.change(comment, { target: { value: "a".repeat(450) } });
+    expect(screen.getByText("450/500 caracteres")).toHaveClass(
+      "review-character-count-attention",
+    );
+
+    fireEvent.change(comment, { target: { value: "🙂".repeat(501) } });
+    expect(screen.getByText("501/500 caracteres")).toHaveClass(
+      "review-character-count-exceeded",
+    );
+  });
+
+  it("keeps 501 creation characters for correction and submits after reducing to 500", async () => {
+    const acceptedComment = "🙂".repeat(500);
+    const createdReview = {
+      ...adaReviews[0],
+      id: 9,
+      comment: acceptedComment,
+    };
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+      if (options?.method === "POST") {
+        return Promise.resolve({ ok: true, status: 201, json: async () => createdReview });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/professors/1");
+    await screen.findByRole("heading", { name: "Nova avaliação" });
+    const comment = screen.getByLabelText("Comentário");
+
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "5" } });
+    fireEvent.change(comment, { target: { value: "🙂".repeat(501) } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "O comentário deve ter no máximo 500 caracteres.",
+    );
+    expect(comment).toHaveValue("🙂".repeat(501));
+    expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "POST"))
+      .toHaveLength(0);
+
+    fireEvent.change(comment, { target: { value: acceptedComment } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Avaliação enviada com sucesso.",
+    );
+    expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "POST"))
+      .toHaveLength(1);
   });
 
   it.each([
@@ -1408,6 +1473,63 @@ describe("review editing", () => {
       "Explicações claras e atividades bem organizadas.",
     );
     expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
+  });
+
+  it("counts edit characters accessibly and submits after correcting 501 to 500", async () => {
+    const acceptedComment = "🙂".repeat(500);
+    const updatedReview = {
+      ...adaReviews[0],
+      comment: acceptedComment,
+      updatedAt: "2025-01-11T14:30:00.000Z",
+    };
+    const fetchMock = vi.fn((url: string, options?: RequestInit) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+      if (options?.method === "PATCH") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => updatedReview });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/professors/1");
+    await screen.findByText("Explicações claras e atividades bem organizadas.");
+    const card = getFirstReviewCard();
+
+    fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
+    const comment = card.getByLabelText("Comentário");
+    const counterId = "review-comment-count-1";
+    expect(comment).toHaveAttribute("aria-describedby", counterId);
+    expect(document.getElementById(counterId)).not.toHaveAttribute("aria-live");
+
+    fireEvent.change(comment, { target: { value: "a".repeat(450) } });
+    expect(card.getByText("450/500 caracteres")).toHaveClass(
+      "review-character-count-attention",
+    );
+    fireEvent.change(comment, { target: { value: "🙂".repeat(501) } });
+    expect(card.getByText("501/500 caracteres")).toHaveClass(
+      "review-character-count-exceeded",
+    );
+    fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(card.getByRole("alert")).toHaveTextContent(
+      "O comentário deve ter no máximo 500 caracteres.",
+    );
+    expect(comment).toHaveValue("🙂".repeat(501));
+    expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "PATCH"))
+      .toHaveLength(0);
+
+    fireEvent.change(comment, { target: { value: `  ${acceptedComment}  ` } });
+    expect(card.getByText("500/500 caracteres")).toHaveClass(
+      "review-character-count-attention",
+    );
+    fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Avaliação atualizada com sucesso.",
+    );
+    expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "PATCH"))
+      .toHaveLength(1);
   });
 
   it.each([

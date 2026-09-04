@@ -26,5 +26,6 @@ export const reviews = pgTable(
   (table) => [
     check("reviews_rating_between_1_and_5", sql`${table.rating} BETWEEN 1 AND 5`),
     check("reviews_comment_not_blank", sql`length(trim(${table.comment})) > 0`),
+    check("reviews_comment_max_500", sql`char_length(${table.comment}) <= 500`),
   ],
 );

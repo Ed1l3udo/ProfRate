@@ -1,0 +1,1 @@
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_comment_max_500" CHECK (char_length("reviews"."comment") <= 500);

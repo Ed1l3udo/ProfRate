@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Review } from "../types/professor.js";
+import {
+  countReviewCommentCharacters,
+  REVIEW_COMMENT_MAX_LENGTH,
+} from "../reviewComment.js";
 
-type EditFeedback = "validation" | "success" | "error" | null;
+type EditFeedback = "validation" | "length" | "success" | "error" | null;
 
 const reviewDateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "short",
@@ -61,6 +65,7 @@ export function ReviewItem({
     event.preventDefault();
 
     const numericRating = Number(rating);
+    const commentLength = countReviewCommentCharacters(comment);
     if (
       rating === "" ||
       !Number.isInteger(numericRating) ||
@@ -69,6 +74,11 @@ export function ReviewItem({
       comment.trim().length === 0
     ) {
       setEditFeedback("validation");
+      return;
+    }
+
+    if (commentLength > REVIEW_COMMENT_MAX_LENGTH) {
+      setEditFeedback("length");
       return;
     }
 
@@ -126,6 +136,14 @@ export function ReviewItem({
       }
     }
   }
+
+  const commentLength = countReviewCommentCharacters(comment);
+  const commentCountClassName =
+    commentLength > REVIEW_COMMENT_MAX_LENGTH
+      ? "review-character-count review-character-count-exceeded"
+      : commentLength >= 450
+        ? "review-character-count review-character-count-attention"
+        : "review-character-count";
 
   async function handleDelete() {
     if (controllerRef.current !== null) {
@@ -191,6 +209,7 @@ export function ReviewItem({
           <textarea
             className="review-input review-textarea"
             id={`review-comment-${review.id}`}
+            aria-describedby={`review-comment-count-${review.id}`}
             value={comment}
             disabled={isSaving}
             onChange={(event) => {
@@ -198,6 +217,12 @@ export function ReviewItem({
               setEditFeedback(null);
             }}
           />
+          <p
+            className={commentCountClassName}
+            id={`review-comment-count-${review.id}`}
+          >
+            {commentLength}/{REVIEW_COMMENT_MAX_LENGTH} caracteres
+          </p>
           <div className="review-edit-actions">
             <button
               className="review-edit-save"
@@ -280,6 +305,11 @@ export function ReviewItem({
       {editFeedback === "validation" ? (
         <p className="form-feedback" role="alert">
           Preencha uma nota de 1 a 5 e um comentário.
+        </p>
+      ) : null}
+      {editFeedback === "length" ? (
+        <p className="form-feedback" role="alert">
+          O comentário deve ter no máximo 500 caracteres.
         </p>
       ) : null}
       {editFeedback === "error" ? (

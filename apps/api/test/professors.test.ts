@@ -367,6 +367,72 @@ describe("POST /professors/:id/reviews", () => {
     });
   });
 
+  it.each([
+    ["500 text characters", "a".repeat(500)],
+    ["500 emoji code points", "🙂".repeat(500)],
+    ["500 characters with surrounding spaces", `  ${"a".repeat(500)}  `],
+  ])("accepts %s and stores the trimmed comment", async (_label, comment) => {
+    const normalizedComment = comment.trim();
+    const findProfessorById = vi.fn().mockResolvedValue({
+      id: 1,
+      name: "Ada Ribeiro",
+      department: "Departamento Aurora",
+    });
+    const createReview = vi.fn().mockResolvedValue({
+      ...testReview,
+      comment: normalizedComment,
+    });
+    const app = createApp({
+      createReview,
+      deleteReview: async () => undefined,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app)
+      .post("/professors/1/reviews")
+      .send({ rating: 5, comment });
+
+    expect(response.status).toBe(201);
+    expect(Array.from(normalizedComment)).toHaveLength(500);
+    expect(createReview).toHaveBeenCalledWith({
+      professorId: 1,
+      rating: 5,
+      comment: normalizedComment,
+    });
+  });
+
+  it.each([
+    ["501 text characters", "a".repeat(501)],
+    ["501 emoji code points", "🙂".repeat(501)],
+  ])("rejects %s before querying repositories", async (_label, comment) => {
+    const findProfessorById = vi.fn();
+    const createReview = vi.fn();
+    const app = createApp({
+      createReview,
+      deleteReview: async () => undefined,
+      findProfessorById,
+      listProfessors: async () => [],
+      listReviewsByProfessorId: async () => [],
+    });
+
+    const response = await request(app)
+      .post("/professors/1/reviews")
+      .send({ rating: 5, comment });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toStrictEqual({
+      error: {
+        code: "INVALID_REVIEW_INPUT",
+        message:
+          "Review body must include an integer rating from 1 to 5 and a non-empty comment of at most 500 characters.",
+      },
+    });
+    expect(findProfessorById).not.toHaveBeenCalled();
+    expect(createReview).not.toHaveBeenCalled();
+  });
+
   it("returns 404 without creating a review when the professor does not exist", async () => {
     const findProfessorById = vi.fn().mockResolvedValue(undefined);
     const createReview = vi.fn();
@@ -455,7 +521,7 @@ describe("POST /professors/:id/reviews", () => {
       error: {
         code: "INVALID_REVIEW_INPUT",
         message:
-          "Review body must include an integer rating from 1 to 5 and a non-empty comment.",
+          "Review body must include an integer rating from 1 to 5 and a non-empty comment of at most 500 characters.",
       },
     });
     expect(findProfessorById).not.toHaveBeenCalled();
@@ -704,6 +770,44 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     });
   });
 
+  it("accepts and trims exactly 500 comment code points", async () => {
+    const comment = "🙂".repeat(500);
+    const findProfessorById = vi.fn().mockResolvedValue(existingProfessor);
+    const updateReview = vi.fn().mockResolvedValue({
+      ...testReview,
+      comment,
+    });
+    const response = await request(createUpdateApp(findProfessorById, updateReview))
+      .patch("/professors/1/reviews/1")
+      .send({ comment: `  ${comment}  ` });
+
+    expect(response.status).toBe(200);
+    expect(updateReview).toHaveBeenCalledWith({
+      professorId: 1,
+      reviewId: 1,
+      comment,
+    });
+  });
+
+  it("rejects 501 comment code points before querying repositories", async () => {
+    const findProfessorById = vi.fn();
+    const updateReview = vi.fn();
+    const response = await request(createUpdateApp(findProfessorById, updateReview))
+      .patch("/professors/1/reviews/1")
+      .send({ comment: "🙂".repeat(501) });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toStrictEqual({
+      error: {
+        code: "INVALID_REVIEW_UPDATE",
+        message:
+          "Review update must contain only valid fields and include an integer rating from 1 to 5 and/or a non-empty comment of at most 500 characters.",
+      },
+    });
+    expect(findProfessorById).not.toHaveBeenCalled();
+    expect(updateReview).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["empty body", {}],
     ["rating 0", { rating: 0 }],
@@ -727,7 +831,8 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     expect(response.body).toStrictEqual({
       error: {
         code: "INVALID_REVIEW_UPDATE",
-        message: "Review update must include a valid rating or non-empty comment.",
+        message:
+          "Review update must contain only valid fields and include an integer rating from 1 to 5 and/or a non-empty comment of at most 500 characters.",
       },
     });
     expect(findProfessorById).not.toHaveBeenCalled();
