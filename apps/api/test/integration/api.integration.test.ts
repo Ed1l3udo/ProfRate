@@ -17,9 +17,27 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
 
   expect(professorsResponse.status).toBe(200);
   expect(professorsResponse.body).toStrictEqual([
-    { id: 1, name: "Alice Teste", department: "Departamento Alfa" },
-    { id: 2, name: "Bruno Teste", department: "Departamento Beta" },
-    { id: 3, name: "Carla Teste", department: "Departamento Gama" },
+    {
+      id: 1,
+      name: "Alice Teste",
+      department: "Departamento Alfa",
+      reviewCount: 2,
+      averageRating: 4.5,
+    },
+    {
+      id: 2,
+      name: "Bruno Teste",
+      department: "Departamento Beta",
+      reviewCount: 1,
+      averageRating: 3,
+    },
+    {
+      id: 3,
+      name: "Carla Teste",
+      department: "Departamento Gama",
+      reviewCount: 0,
+      averageRating: null,
+    },
   ]);
 
   const createResponse = await request(app)

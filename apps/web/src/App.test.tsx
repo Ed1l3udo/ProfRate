@@ -31,6 +31,28 @@ const ada = {
   department: "Departamento Aurora",
 };
 
+const adaListItem = {
+  ...ada,
+  reviewCount: 2,
+  averageRating: 4.5,
+};
+
+const caioListItem = {
+  id: 2,
+  name: "Caio Nogueira",
+  department: "Departamento Horizonte",
+  reviewCount: 1,
+  averageRating: 3,
+};
+
+const linaListItem = {
+  id: 3,
+  name: "Lina Vasconcelos",
+  department: "Departamento Pioneiro",
+  reviewCount: 0,
+  averageRating: null,
+};
+
 const adaReviews = [
   {
     id: 1,
@@ -151,10 +173,7 @@ describe("professors list", () => {
   it("shows links to the professor details pages", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [
-        { id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" },
-        { id: 2, name: "Caio Nogueira", department: "Departamento Horizonte" },
-      ],
+      json: async () => [adaListItem, caioListItem, linaListItem],
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -165,6 +184,25 @@ describe("professors list", () => {
     expect(screen.getByText("Caio Nogueira")).toBeInTheDocument();
     expect(screen.getByText("Departamento Aurora")).toBeInTheDocument();
     expect(screen.getByText("Departamento Horizonte")).toBeInTheDocument();
+    expect(screen.getByText("Departamento Pioneiro")).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", {
+        name: "Resumo de avaliações de Ada Ribeiro",
+      }),
+    ).toHaveTextContent("2 avaliaçõesMédia: 4,5/5");
+    expect(
+      screen.getByRole("group", {
+        name: "Resumo de avaliações de Caio Nogueira",
+      }),
+    ).toHaveTextContent("1 avaliaçãoMédia: 3,0/5");
+    const linaReviewSummary = screen.getByRole("group", {
+      name: "Resumo de avaliações de Lina Vasconcelos",
+    });
+    expect(linaReviewSummary).toHaveTextContent("Sem avaliações");
+    expect(linaReviewSummary).not.toHaveTextContent("Média:");
+    expect(linaReviewSummary).not.toHaveTextContent("0,0/5");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/reviews"))).toBe(false);
     expect(fetchMock.mock.calls[0][0]).toBe("/api/professors");
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ signal: expect.any(AbortSignal) });
     expect(screen.getByRole("link", { name: "Ada Ribeiro" })).toHaveAttribute(
@@ -201,7 +239,7 @@ describe("professors list", () => {
         ok: true,
         json: async () =>
           url === "/api/professors?search=ada"
-            ? [{ id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" }]
+            ? [adaListItem]
             : [],
       }),
     );
@@ -228,7 +266,7 @@ describe("professors list", () => {
         ok: true,
         json: async () =>
           url === "/api/professors?department=aurora"
-            ? [{ id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" }]
+            ? [adaListItem]
             : [],
       }),
     );
@@ -251,7 +289,7 @@ describe("professors list", () => {
         ok: true,
         json: async () =>
           url === "/api/professors?search=ada&department=aurora"
-            ? [{ id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" }]
+            ? [adaListItem]
             : [],
       }),
     );
@@ -282,7 +320,7 @@ describe("professors list", () => {
       if (url === "/api/professors") {
         return Promise.resolve({
           ok: true,
-          json: async () => [{ id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" }],
+          json: async () => [adaListItem],
         });
       }
 
@@ -308,11 +346,8 @@ describe("professors list", () => {
         ok: true,
         json: async () =>
           url === "/api/professors?search=ada"
-            ? [{ id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" }]
-            : [
-                { id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" },
-                { id: 2, name: "Caio Nogueira", department: "Departamento Horizonte" },
-              ],
+            ? [adaListItem]
+            : [adaListItem, caioListItem],
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -332,6 +367,46 @@ describe("professors list", () => {
     expect(screen.getByLabelText("Buscar por nome")).toHaveValue("");
     expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("");
     expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("/api/professors");
+  });
+
+  it("reloads the list summary after returning from professor details", async () => {
+    let listRequestCount = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/professors") {
+        listRequestCount += 1;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [
+            listRequestCount === 1
+              ? adaListItem
+              : { ...adaListItem, reviewCount: 3, averageRating: 14 / 3 },
+          ],
+        });
+      }
+
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/");
+    expect(await screen.findByText("2 avaliações")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("link", { name: "Ada Ribeiro" }));
+    expect(await screen.findByRole("link", { name: "Voltar para a lista" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Voltar para a lista" }));
+
+    expect(await screen.findByText("3 avaliações")).toBeInTheDocument();
+    expect(screen.getByText("Média: 4,7/5")).toBeInTheDocument();
+    expect(listRequestCount).toBe(2);
   });
 });
 

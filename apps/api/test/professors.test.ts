@@ -27,9 +27,27 @@ const testReview = {
 describe("GET /professors", () => {
   it("returns the professors provided by the repository", async () => {
     const professors = [
-      { id: 1, name: "Ada Ribeiro", department: "Departamento Aurora" },
-      { id: 2, name: "Caio Nogueira", department: "Departamento Horizonte" },
-      { id: 3, name: "Lina Vasconcelos", department: "Departamento Pioneiro" },
+      {
+        id: 1,
+        name: "Ada Ribeiro",
+        department: "Departamento Aurora",
+        reviewCount: 2,
+        averageRating: 4.5,
+      },
+      {
+        id: 2,
+        name: "Caio Nogueira",
+        department: "Departamento Horizonte",
+        reviewCount: 1,
+        averageRating: 4,
+      },
+      {
+        id: 3,
+        name: "Lina Vasconcelos",
+        department: "Departamento Pioneiro",
+        reviewCount: 0,
+        averageRating: null,
+      },
     ];
     const listProfessors = vi.fn().mockResolvedValue(professors);
     const app = createApp({
@@ -44,6 +62,13 @@ describe("GET /professors", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toStrictEqual(professors);
+    expect(response.body.map((professor: { id: number }) => professor.id)).toStrictEqual([
+      1, 2, 3,
+    ]);
+    expect(typeof response.body[0].reviewCount).toBe("number");
+    expect(Number.isInteger(response.body[0].reviewCount)).toBe(true);
+    expect(typeof response.body[0].averageRating).toBe("number");
+    expect(response.body[2].averageRating).toBeNull();
     expect(listProfessors).toHaveBeenCalledOnce();
     expect(listProfessors).toHaveBeenCalledWith({});
   });

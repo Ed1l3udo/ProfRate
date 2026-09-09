@@ -163,7 +163,7 @@ h3 {
 
 .professor-card-link {
   display: block;
-  padding: 1rem 1.1rem;
+  padding: 1rem 1.1rem 0.5rem;
   font-size: 1.05rem;
   font-weight: 700;
   text-decoration: none;
@@ -175,6 +175,16 @@ h3 {
   color: #617286;
   font-size: 0.9rem;
   font-weight: 400;
+}
+
+.professor-review-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  padding: 0 1.1rem 1rem;
+  color: #176b87;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .review-section {

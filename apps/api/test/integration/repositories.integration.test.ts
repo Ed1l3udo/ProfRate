@@ -93,10 +93,39 @@ it("lists professors ordered by id", async () => {
   const { professorsRepository } = getIntegrationContext();
 
   await expect(professorsRepository.listProfessors()).resolves.toStrictEqual([
-    { id: 1, name: "Alice Teste", department: "Departamento Alfa" },
-    { id: 2, name: "Bruno Teste", department: "Departamento Beta" },
-    { id: 3, name: "Carla Teste", department: "Departamento Gama" },
+    {
+      id: 1,
+      name: "Alice Teste",
+      department: "Departamento Alfa",
+      reviewCount: 2,
+      averageRating: 4.5,
+    },
+    {
+      id: 2,
+      name: "Bruno Teste",
+      department: "Departamento Beta",
+      reviewCount: 1,
+      averageRating: 3,
+    },
+    {
+      id: 3,
+      name: "Carla Teste",
+      department: "Departamento Gama",
+      reviewCount: 0,
+      averageRating: null,
+    },
   ]);
+});
+
+it("returns numeric review aggregates and preserves professors without reviews", async () => {
+  const { professorsRepository } = getIntegrationContext();
+  const result = await professorsRepository.listProfessors();
+
+  expect(typeof result[0].reviewCount).toBe("number");
+  expect(Number.isInteger(result[0].reviewCount)).toBe(true);
+  expect(typeof result[0].averageRating).toBe("number");
+  expect(result[2].reviewCount).toBe(0);
+  expect(result[2].averageRating).toBeNull();
 });
 
 it("searches professors by a case-insensitive partial name", async () => {
@@ -105,7 +134,13 @@ it("searches professors by a case-insensitive partial name", async () => {
   await expect(
     professorsRepository.listProfessors({ search: "LiCe" }),
   ).resolves.toStrictEqual([
-    { id: 1, name: "Alice Teste", department: "Departamento Alfa" },
+    {
+      id: 1,
+      name: "Alice Teste",
+      department: "Departamento Alfa",
+      reviewCount: 2,
+      averageRating: 4.5,
+    },
   ]);
 });
 
@@ -115,8 +150,66 @@ it("filters professors by a partial department", async () => {
   await expect(
     professorsRepository.listProfessors({ department: "beta" }),
   ).resolves.toStrictEqual([
-    { id: 2, name: "Bruno Teste", department: "Departamento Beta" },
+    {
+      id: 2,
+      name: "Bruno Teste",
+      department: "Departamento Beta",
+      reviewCount: 1,
+      averageRating: 3,
+    },
   ]);
+});
+
+it("combines professor filters while preserving aggregates", async () => {
+  const { professorsRepository } = getIntegrationContext();
+
+  await expect(
+    professorsRepository.listProfessors({
+      search: "bruno",
+      department: "beta",
+    }),
+  ).resolves.toStrictEqual([
+    {
+      id: 2,
+      name: "Bruno Teste",
+      department: "Departamento Beta",
+      reviewCount: 1,
+      averageRating: 3,
+    },
+  ]);
+});
+
+it("recalculates review aggregates after create, update, and delete", async () => {
+  const { professorsRepository, reviewsRepository } = getIntegrationContext();
+  const initialProfessor = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
+
+  expect(initialProfessor).toMatchObject({ reviewCount: 2, averageRating: 4.5 });
+
+  const createdReview = await reviewsRepository.createReview({
+    professorId: 1,
+    rating: 1,
+    comment: "Avaliação temporária para recalcular o resumo.",
+  });
+  const afterCreate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
+
+  expect(afterCreate.reviewCount).toBe(3);
+  expect(afterCreate.averageRating).toBeCloseTo(10 / 3);
+
+  await reviewsRepository.updateReview({
+    professorId: 1,
+    reviewId: createdReview.id,
+    rating: 4,
+  });
+  const afterUpdate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
+
+  expect(afterUpdate.reviewCount).toBe(3);
+  expect(afterUpdate.averageRating).toBeCloseTo(13 / 3);
+
+  await reviewsRepository.deleteReview({ professorId: 1, reviewId: createdReview.id });
+
+  await expect(
+    professorsRepository.listProfessors({ search: "Alice" }),
+  ).resolves.toStrictEqual([initialProfessor]);
 });
 
 it("finds an existing professor and returns undefined for a missing id", async () => {

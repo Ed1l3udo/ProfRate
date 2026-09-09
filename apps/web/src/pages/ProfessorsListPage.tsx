@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
-import type { ProfessorSummary } from "../types/professor.js";
+import type { ProfessorListItem } from "../types/professor.js";
 
 type LoadState = "loading" | "success" | "error";
 
@@ -11,9 +11,13 @@ type ProfessorFilters = {
 };
 
 const emptyFilters: ProfessorFilters = { search: "", department: "" };
+const averageRatingFormatter = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
 export function ProfessorsListPage() {
-  const [professors, setProfessors] = useState<ProfessorSummary[]>([]);
+  const [professors, setProfessors] = useState<ProfessorListItem[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [searchInput, setSearchInput] = useState("");
   const [departmentInput, setDepartmentInput] = useState("");
@@ -47,7 +51,7 @@ export function ProfessorsListPage() {
           throw new Error("Unable to load professors.");
         }
 
-        const data = (await response.json()) as ProfessorSummary[];
+        const data = (await response.json()) as ProfessorListItem[];
 
         if (controller.signal.aborted) {
           return;
@@ -133,6 +137,27 @@ export function ProfessorsListPage() {
               <span>{professor.name}</span>
               <small>{professor.department}</small>
             </Link>
+            <div
+              className="professor-review-summary"
+              role="group"
+              aria-label={`Resumo de avaliações de ${professor.name}`}
+            >
+              {professor.reviewCount === 0 ? (
+                <span>Sem avaliações</span>
+              ) : (
+                <>
+                  <span>
+                    {professor.reviewCount}{" "}
+                    {professor.reviewCount === 1 ? "avaliação" : "avaliações"}
+                  </span>
+                  {professor.averageRating !== null ? (
+                    <span>
+                      Média: {averageRatingFormatter.format(professor.averageRating)}/5
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </div>
           </li>
         ))}
       </ul>
