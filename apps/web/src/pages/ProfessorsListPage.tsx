@@ -1,27 +1,37 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
 import type { ProfessorListItem } from "../types/professor.js";
+import {
+  createProfessorSearchParams,
+  readProfessorFilters,
+} from "../utils/professorFilters.js";
 
 type LoadState = "loading" | "success" | "error";
 
-type ProfessorFilters = {
-  search: string;
-  department: string;
-};
-
-const emptyFilters: ProfessorFilters = { search: "", department: "" };
 const averageRatingFormatter = new Intl.NumberFormat("pt-BR", {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
 
 export function ProfessorsListPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const appliedFilters = readProfessorFilters(searchParams);
+  const appliedSearch = appliedFilters.search;
+  const appliedDepartment = appliedFilters.department;
+  const canonicalSearchParams = createProfessorSearchParams({
+    search: appliedSearch,
+    department: appliedDepartment,
+  }).toString();
   const [professors, setProfessors] = useState<ProfessorListItem[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [searchInput, setSearchInput] = useState("");
   const [departmentInput, setDepartmentInput] = useState("");
-  const [filters, setFilters] = useState<ProfessorFilters>(emptyFilters);
+
+  useEffect(() => {
+    setSearchInput(appliedSearch);
+    setDepartmentInput(appliedDepartment);
+  }, [appliedDepartment, appliedSearch]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,18 +39,9 @@ export function ProfessorsListPage() {
 
     async function loadProfessors() {
       try {
-        const searchParams = new URLSearchParams();
-
-        if (filters.search !== "") {
-          searchParams.set("search", filters.search);
-        }
-
-        if (filters.department !== "") {
-          searchParams.set("department", filters.department);
-        }
-
-        const query = searchParams.toString();
-        const url = query === "" ? "/api/professors" : `/api/professors?${query}`;
+        const url = canonicalSearchParams === ""
+          ? "/api/professors"
+          : `/api/professors?${canonicalSearchParams}`;
         const response = await fetch(url, { signal: controller.signal });
 
         if (controller.signal.aborted) {
@@ -71,20 +72,33 @@ export function ProfessorsListPage() {
     return () => {
       controller.abort();
     };
-  }, [filters]);
+  }, [canonicalSearchParams]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFilters({
+
+    const normalizedFilters = {
       search: searchInput.trim(),
       department: departmentInput.trim(),
-    });
+    };
+    const nextSearchParams = createProfessorSearchParams(normalizedFilters);
+    const nextCanonicalSearchParams = nextSearchParams.toString();
+
+    setSearchInput(normalizedFilters.search);
+    setDepartmentInput(normalizedFilters.department);
+
+    if (searchParams.toString() !== nextCanonicalSearchParams) {
+      setSearchParams(nextSearchParams);
+    }
   }
 
   function handleClearFilters() {
     setSearchInput("");
     setDepartmentInput("");
-    setFilters({ ...emptyFilters });
+
+    if (searchParams.toString() !== "") {
+      setSearchParams(new URLSearchParams());
+    }
   }
 
   if (loadState === "loading") {
@@ -132,7 +146,11 @@ export function ProfessorsListPage() {
             <Link
               className="professor-card-link"
               aria-label={professor.name}
-              to={`/professors/${professor.id}`}
+              to={
+                canonicalSearchParams === ""
+                  ? `/professors/${professor.id}`
+                  : `/professors/${professor.id}?${canonicalSearchParams}`
+              }
             >
               <span>{professor.name}</span>
               <small>{professor.department}</small>

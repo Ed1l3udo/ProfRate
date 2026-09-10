@@ -1,13 +1,22 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 
 import { ProfessorReviews } from "../components/ProfessorReviews.js";
 import type { ProfessorDetails } from "../types/professor.js";
+import {
+  createProfessorSearchParams,
+  readProfessorFilters,
+} from "../utils/professorFilters.js";
 
 type LoadState = "loading" | "success" | "not-found" | "invalid-id" | "error";
 
 export function ProfessorDetailsPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const returnSearchParams = createProfessorSearchParams(
+    readProfessorFilters(new URLSearchParams(location.search)),
+  ).toString();
+  const returnTo = returnSearchParams === "" ? "/" : `/?${returnSearchParams}`;
   const [professor, setProfessor] = useState<ProfessorDetails | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
 
@@ -80,7 +89,7 @@ export function ProfessorDetailsPage() {
         <h1>{professor.name}</h1>
         <p className="professor-department">Departamento: {professor.department}</p>
         <ProfessorReviews professorId={professor.id} />
-        <Link className="back-link" to="/">Voltar para a lista</Link>
+        <Link className="back-link" to={returnTo}>Voltar para a lista</Link>
       </main>
     );
   }
@@ -95,7 +104,7 @@ export function ProfessorDetailsPage() {
   return (
     <main className="page-shell">
       <p className="state-message" role="alert">{message}</p>
-      <Link className="back-link" to="/">Voltar para a lista</Link>
+      <Link className="back-link" to={returnTo}>Voltar para a lista</Link>
     </main>
   );
 }

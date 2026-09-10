@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 
 import { App } from "./App.js";
 import { ProfessorReviews } from "./components/ProfessorReviews.js";
@@ -11,6 +11,34 @@ function renderApp(initialEntry: string) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <App />
+      <LocationObserver />
+    </MemoryRouter>,
+  );
+}
+
+function LocationObserver() {
+  const location = useLocation();
+
+  return <div data-testid="location" hidden>{location.pathname}{location.search}</div>;
+}
+
+function HistoryControls() {
+  const navigate = useNavigate();
+
+  return (
+    <>
+      <button type="button" onClick={() => void navigate(-1)}>Voltar no histórico</button>
+      <button type="button" onClick={() => void navigate(1)}>Avançar no histórico</button>
+    </>
+  );
+}
+
+function renderAppWithHistory(initialEntries: string[], initialIndex: number) {
+  return render(
+    <MemoryRouter initialEntries={initialEntries} initialIndex={initialIndex}>
+      <App />
+      <LocationObserver />
+      <HistoryControls />
     </MemoryRouter>,
   );
 }
@@ -223,6 +251,118 @@ describe("professors list", () => {
     expect(await screen.findByText("Nenhum professor encontrado.")).toBeInTheDocument();
   });
 
+  it.each([
+    [
+      "name",
+      "/?search=ada",
+      "/api/professors?search=ada",
+      "ada",
+      "",
+    ],
+    [
+      "department",
+      "/?department=aurora",
+      "/api/professors?department=aurora",
+      "",
+      "aurora",
+    ],
+    [
+      "combined",
+      "/?search=ada&department=aurora",
+      "/api/professors?search=ada&department=aurora",
+      "ada",
+      "aurora",
+    ],
+  ])(
+    "loads direct URL filters for %s",
+    async (_label, initialEntry, expectedApiUrl, expectedSearch, expectedDepartment) => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [adaListItem],
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      renderApp(initialEntry);
+
+      expect(await screen.findByText("Ada Ribeiro")).toBeInTheDocument();
+      expect(screen.getByLabelText("Buscar por nome")).toHaveValue(expectedSearch);
+      expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue(
+        expectedDepartment,
+      );
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(fetchMock.mock.calls[0][0]).toBe(expectedApiUrl);
+    },
+  );
+
+  it("normalizes spaces and accents with URLSearchParams on submit", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/");
+    await screen.findByText("Nenhum professor encontrado.");
+    fireEvent.change(screen.getByLabelText("Buscar por nome"), {
+      target: { value: "  Ana Maria  " },
+    });
+    fireEvent.change(screen.getByLabelText("Filtrar por departamento"), {
+      target: { value: "  Computação Aplicada  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+
+    const expectedQuery = "?search=Ana+Maria&department=Computa%C3%A7%C3%A3o+Aplicada";
+    expect(await screen.findByTestId("location")).toHaveTextContent(`/${expectedQuery}`);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toBe(`/api/professors${expectedQuery}`);
+  });
+
+  it("omits repeated filters and unknown parameters from the API request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [adaListItem],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/?search=ada&search=caio&department=%20aurora%20&extra=value");
+
+    expect(await screen.findByText("Ada Ribeiro")).toBeInTheDocument();
+    expect(screen.getByLabelText("Buscar por nome")).toHaveValue("");
+    expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("aurora");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/professors?department=aurora");
+  });
+
+  it("omits empty URL filters from the API request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [adaListItem],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/?search=%20%20&department=");
+
+    expect(await screen.findByText("Ada Ribeiro")).toBeInTheDocument();
+    expect(screen.getByLabelText("Buscar por nome")).toHaveValue("");
+    expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/professors");
+  });
+
+  it("removes unknown parameters without refetching unchanged recognized filters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [adaListItem],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/?search=ada&extra=value");
+    await screen.findByText("Ada Ribeiro");
+    expect(fetchMock).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(await screen.findByTestId("location")).toHaveTextContent("/?search=ada");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("shows an error state when the API request fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
 
@@ -252,12 +392,75 @@ describe("professors list", () => {
       target: { value: " ada " },
     });
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
 
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
 
     expect(await screen.findByText("Ada Ribeiro")).toBeInTheDocument();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/professors?search=ada");
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ signal: expect.any(AbortSignal) });
+    expect(screen.getByTestId("location")).toHaveTextContent("/?search=ada");
+  });
+
+  it("does not refetch when the submitted filters are already applied", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [adaListItem],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/?search=ada");
+    await screen.findByText("Ada Ribeiro");
+    fireEvent.change(screen.getByLabelText("Buscar por nome"), {
+      target: { value: " ada " },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent("/?search=ada");
+    expect(screen.getByLabelText("Buscar por nome")).toHaveValue("ada");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not add a history entry when submitting the current canonical URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [adaListItem],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAppWithHistory(["/previous", "/?search=ada"], 1);
+    await screen.findByText("Ada Ribeiro");
+
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Voltar no histórico" }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/previous");
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not add history or refetch when clearing an already empty URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [adaListItem],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAppWithHistory(["/previous", "/"], 1);
+    await screen.findByText("Ada Ribeiro");
+
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(screen.getByLabelText("Buscar por nome")).toHaveValue("");
+    expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Voltar no histórico" }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/previous");
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("submits only the department filter", async () => {
@@ -367,12 +570,46 @@ describe("professors list", () => {
     expect(screen.getByLabelText("Buscar por nome")).toHaveValue("");
     expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("");
     expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("/api/professors");
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
+  });
+
+  it("synchronizes filters and results when navigating backward and forward", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [adaListItem],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAppWithHistory(
+      ["/", "/?search=ada", "/?department=aurora"],
+      2,
+    );
+    await screen.findByText("Ada Ribeiro");
+    expect(screen.getByLabelText("Buscar por nome")).toHaveValue("");
+    expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("aurora");
+
+    fireEvent.click(screen.getByRole("button", { name: "Voltar no histórico" }));
+    await vi.waitFor(() => {
+      expect(screen.getByLabelText("Buscar por nome")).toHaveValue("ada");
+      expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("");
+    });
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("/api/professors?search=ada");
+
+    fireEvent.click(screen.getByRole("button", { name: "Avançar no histórico" }));
+    await vi.waitFor(() => {
+      expect(screen.getByLabelText("Buscar por nome")).toHaveValue("");
+      expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("aurora");
+    });
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe(
+      "/api/professors?department=aurora",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("reloads the list summary after returning from professor details", async () => {
     let listRequestCount = 0;
     const fetchMock = vi.fn((url: string) => {
-      if (url === "/api/professors") {
+      if (url === "/api/professors?search=ada&department=aurora") {
         listRequestCount += 1;
         return Promise.resolve({
           ok: true,
@@ -397,15 +634,34 @@ describe("professors list", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    renderApp("/");
+    renderApp("/?search=ada&department=aurora&extra=value");
     expect(await screen.findByText("2 avaliações")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ada Ribeiro" })).toHaveAttribute(
+      "href",
+      "/professors/1?search=ada&department=aurora",
+    );
 
     fireEvent.click(screen.getByRole("link", { name: "Ada Ribeiro" }));
-    expect(await screen.findByRole("link", { name: "Voltar para a lista" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("link", { name: "Voltar para a lista" }));
+    const backLink = await screen.findByRole("link", { name: "Voltar para a lista" });
+    expect(backLink).toHaveAttribute("href", "/?search=ada&department=aurora");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/professors/1");
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain(
+      "/api/professors/1/reviews",
+    );
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).startsWith("/api/professors/1?"),
+      ),
+    ).toBe(false);
+    fireEvent.click(backLink);
 
     expect(await screen.findByText("3 avaliações")).toBeInTheDocument();
     expect(screen.getByText("Média: 4,7/5")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/?search=ada&department=aurora",
+    );
+    expect(screen.getByLabelText("Buscar por nome")).toHaveValue("ada");
+    expect(screen.getByLabelText("Filtrar por departamento")).toHaveValue("aurora");
     expect(listRequestCount).toBe(2);
   });
 });
@@ -504,6 +760,35 @@ describe("professor details", () => {
       ([url]) => url === "/api/professors/1/reviews",
     );
     expect(reviewsCall?.[1]).toMatchObject({ signal: expect.anything() });
+  });
+
+  it("normalizes recognized filters in the return link without changing API URLs", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/professors/1") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ada });
+      }
+
+      if (url === "/api/professors/1/reviews") {
+        return Promise.resolve({ ok: true, status: 200, json: async () => adaReviews });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp(
+      "/professors/1?search=ada&search=caio&department=%20aurora%20&extra=value",
+    );
+
+    expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Voltar para a lista" })).toHaveAttribute(
+      "href",
+      "/?department=aurora",
+    );
+    expect(fetchMock.mock.calls.map(([url]) => url)).toStrictEqual([
+      "/api/professors/1",
+      "/api/professors/1/reviews",
+    ]);
   });
 
   it("shows an empty state when the professor has no reviews", async () => {
