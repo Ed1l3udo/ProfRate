@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 
 import { reviews } from "../../src/db/schema.js";
 import { getIntegrationContext, reviewFixtureTimestamp } from "./database.js";
@@ -87,6 +87,107 @@ it("has the explicit 500-character comment check constraint", async () => {
       definition: expect.stringContaining("char_length(comment) <= 500"),
     },
   ]);
+});
+
+it("normalizes professor departments with a required foreign key", async () => {
+  const { database } = getIntegrationContext();
+  const columns = await database.pool.query<{ column_name: string; is_nullable: string }>(`
+    SELECT column_name, is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'professors'
+      AND column_name IN ('department', 'department_id')
+  `);
+  const foreignKey = await database.pool.query<{ constraint_name: string }>(`
+    SELECT conname AS constraint_name
+    FROM pg_constraint
+    WHERE conname = 'professors_department_id_departments_id_fk'
+  `);
+
+  expect(columns.rows).toStrictEqual([{ column_name: "department_id", is_nullable: "NO" }]);
+  expect(foreignKey.rows).toStrictEqual([
+    { constraint_name: "professors_department_id_departments_id_fk" },
+  ]);
+});
+
+it("lists departments and filters courses by department", async () => {
+  const { departmentsRepository, coursesRepository } = getIntegrationContext();
+
+  await expect(departmentsRepository.listDepartments()).resolves.toStrictEqual([
+    { id: 1, name: "Departamento Alfa" },
+    { id: 2, name: "Departamento Beta" },
+    { id: 3, name: "Departamento Gama" },
+  ]);
+  await expect(coursesRepository.listCourses({ departmentId: 2 })).resolves.toStrictEqual([
+    { id: 2, name: "Curso Beta", departmentId: 2, department: "Departamento Beta" },
+  ]);
+});
+
+it("lists disciplines with courses using a constant query count", async () => {
+  const { database, disciplinesRepository } = getIntegrationContext();
+  const querySpy = vi.spyOn(database.pool, "query");
+
+  const result = await disciplinesRepository.listDisciplines();
+
+  expect(result).toStrictEqual([
+    {
+      id: 1,
+      code: "TST101",
+      name: "Programação de Teste",
+      workloadHours: 64,
+      department: { id: 1, name: "Departamento Alfa" },
+      courses: [{ id: 1, name: "Curso Alfa" }, { id: 2, name: "Curso Beta" }],
+    },
+    {
+      id: 2,
+      code: "TST102",
+      name: "Banco de Teste",
+      workloadHours: 32,
+      department: { id: 1, name: "Departamento Alfa" },
+      courses: [{ id: 1, name: "Curso Alfa" }],
+    },
+    {
+      id: 3,
+      code: "LAB201",
+      name: "Laboratório Beta",
+      workloadHours: 48,
+      department: { id: 2, name: "Departamento Beta" },
+      courses: [{ id: 2, name: "Curso Beta" }],
+    },
+  ]);
+  expect(querySpy).toHaveBeenCalledTimes(2);
+  querySpy.mockRestore();
+});
+
+it("combines discipline search, department, and course filters", async () => {
+  const { disciplinesRepository } = getIntegrationContext();
+
+  await expect(
+    disciplinesRepository.listDisciplines({ search: "tst101", departmentId: 1, courseId: 2 }),
+  ).resolves.toStrictEqual([
+    {
+      id: 1,
+      code: "TST101",
+      name: "Programação de Teste",
+      workloadHours: 64,
+      department: { id: 1, name: "Departamento Alfa" },
+      courses: [{ id: 1, name: "Curso Alfa" }, { id: 2, name: "Curso Beta" }],
+    },
+  ]);
+});
+
+it("returns discipline details with courses and professors", async () => {
+  const { disciplinesRepository } = getIntegrationContext();
+
+  await expect(disciplinesRepository.findDisciplineById(1)).resolves.toStrictEqual({
+    id: 1,
+    code: "TST101",
+    name: "Programação de Teste",
+    workloadHours: 64,
+    department: { id: 1, name: "Departamento Alfa" },
+    courses: [{ id: 1, name: "Curso Alfa" }, { id: 2, name: "Curso Beta" }],
+    professors: [{ id: 1, name: "Alice Teste" }, { id: 2, name: "Bruno Teste" }],
+  });
+  await expect(disciplinesRepository.findDisciplineById(999_999)).resolves.toBeUndefined();
 });
 
 it("lists professors ordered by id", async () => {

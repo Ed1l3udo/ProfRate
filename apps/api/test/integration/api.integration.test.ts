@@ -149,3 +149,40 @@ it("enforces the 500-code-point comment limit through POST and PATCH", async () 
   expect(rejectedUpdateResponse.status).toBe(400);
   expect(rejectedUpdateResponse.body.error.code).toBe("INVALID_REVIEW_UPDATE");
 });
+
+it("serves the catalog through the HTTP API with real repositories", async () => {
+  const {
+    coursesRepository,
+    departmentsRepository,
+    disciplinesRepository,
+    professorsRepository,
+    reviewsRepository,
+  } = getIntegrationContext();
+  const app = createApp({
+    ...coursesRepository,
+    ...departmentsRepository,
+    ...disciplinesRepository,
+    ...professorsRepository,
+    ...reviewsRepository,
+  });
+
+  const departmentsResponse = await request(app).get("/departments");
+  const coursesResponse = await request(app).get("/courses?departmentId=2");
+  const disciplinesResponse = await request(app).get(
+    "/disciplines?search=tst101&departmentId=1&courseId=2",
+  );
+  const detailsResponse = await request(app).get("/disciplines/1");
+
+  expect(departmentsResponse.status).toBe(200);
+  expect(departmentsResponse.body).toHaveLength(3);
+  expect(coursesResponse.body).toStrictEqual([
+    { id: 2, name: "Curso Beta", departmentId: 2, department: "Departamento Beta" },
+  ]);
+  expect(disciplinesResponse.status).toBe(200);
+  expect(disciplinesResponse.body).toHaveLength(1);
+  expect(detailsResponse.status).toBe(200);
+  expect(detailsResponse.body.professors).toStrictEqual([
+    { id: 1, name: "Alice Teste" },
+    { id: 2, name: "Bruno Teste" },
+  ]);
+});

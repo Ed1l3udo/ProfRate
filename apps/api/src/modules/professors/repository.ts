@@ -1,7 +1,7 @@
 import { and, asc, count, eq, ilike, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/database.js";
-import { professors, reviews } from "../../db/schema.js";
+import { departments, professors, reviews } from "../../db/schema.js";
 import type { ProfessorFilters } from "./schemas.js";
 
 export function createProfessorsRepository(db: Database) {
@@ -10,11 +10,12 @@ export function createProfessorsRepository(db: Database) {
       .select({
         id: professors.id,
         name: professors.name,
-        department: professors.department,
+        department: departments.name,
         reviewCount: count(reviews.id),
         averageRating: sql<number | null>`avg(${reviews.rating})::double precision`,
       })
       .from(professors)
+      .innerJoin(departments, eq(departments.id, professors.departmentId))
       .leftJoin(reviews, eq(reviews.professorId, professors.id))
       .where(
         and(
@@ -23,10 +24,10 @@ export function createProfessorsRepository(db: Database) {
             : ilike(professors.name, `%${filters.search}%`),
           filters.department === undefined
             ? undefined
-            : ilike(professors.department, `%${filters.department}%`),
+            : ilike(departments.name, `%${filters.department}%`),
         ),
       )
-      .groupBy(professors.id, professors.name, professors.department)
+      .groupBy(professors.id, professors.name, departments.name)
       .orderBy(asc(professors.id));
   }
 
@@ -35,9 +36,10 @@ export function createProfessorsRepository(db: Database) {
       .select({
         id: professors.id,
         name: professors.name,
-        department: professors.department,
+        department: departments.name,
       })
       .from(professors)
+      .innerJoin(departments, eq(departments.id, professors.departmentId))
       .where(eq(professors.id, id))
       .limit(1);
 

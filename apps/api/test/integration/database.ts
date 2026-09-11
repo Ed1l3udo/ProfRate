@@ -6,7 +6,18 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import type { Pool } from "pg";
 
 import { createDatabase } from "../../src/db/database.js";
-import { professors, reviews } from "../../src/db/schema.js";
+import {
+  courseDisciplines,
+  courses,
+  departments,
+  disciplines,
+  professorDisciplines,
+  professors,
+  reviews,
+} from "../../src/db/schema.js";
+import { createCoursesRepository } from "../../src/modules/courses/repository.js";
+import { createDepartmentsRepository } from "../../src/modules/departments/repository.js";
+import { createDisciplinesRepository } from "../../src/modules/disciplines/repository.js";
 import { createProfessorsRepository } from "../../src/modules/professors/repository.js";
 import { createReviewsRepository } from "../../src/modules/reviews/repository.js";
 
@@ -18,10 +29,11 @@ const migrationsFolder = resolve(
 );
 
 const professorFixtures = [
-  { name: "Alice Teste", department: "Departamento Alfa" },
-  { name: "Bruno Teste", department: "Departamento Beta" },
-  { name: "Carla Teste", department: "Departamento Gama" },
+  { name: "Alice Teste", departmentIndex: 0 },
+  { name: "Bruno Teste", departmentIndex: 1 },
+  { name: "Carla Teste", departmentIndex: 2 },
 ];
+const departmentFixtures = ["Departamento Alfa", "Departamento Beta", "Departamento Gama"];
 
 type DatabaseTarget = {
   hostname: string;
@@ -129,6 +141,9 @@ type IntegrationContext = {
   database: IntegrationDatabase;
   professorsRepository: ReturnType<typeof createProfessorsRepository>;
   reviewsRepository: ReturnType<typeof createReviewsRepository>;
+  departmentsRepository: ReturnType<typeof createDepartmentsRepository>;
+  coursesRepository: ReturnType<typeof createCoursesRepository>;
+  disciplinesRepository: ReturnType<typeof createDisciplinesRepository>;
 };
 
 let context: IntegrationContext | undefined;
@@ -149,6 +164,9 @@ export async function initializeIntegrationDatabase(): Promise<void> {
       database,
       professorsRepository: createProfessorsRepository(database.db),
       reviewsRepository: createReviewsRepository(database.db),
+      departmentsRepository: createDepartmentsRepository(database.db),
+      coursesRepository: createCoursesRepository(database.db),
+      disciplinesRepository: createDisciplinesRepository(database.db),
     };
   } catch (error) {
     await database.close();
@@ -169,7 +187,7 @@ async function truncateIntegrationTables(): Promise<void> {
 
   await assertConnectedToIntegrationDatabase(database.pool);
   await database.db.execute(
-    sql`TRUNCATE TABLE reviews, professors RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE reviews, professor_disciplines, course_disciplines, disciplines, courses, professors, departments RESTART IDENTITY CASCADE`,
   );
 }
 
@@ -177,10 +195,47 @@ export async function resetIntegrationDatabase(): Promise<void> {
   await truncateIntegrationTables();
 
   const { database } = getIntegrationContext();
+  const insertedDepartments = await database.db
+    .insert(departments)
+    .values(departmentFixtures.map((name) => ({ name })))
+    .returning({ id: departments.id });
   const insertedProfessors = await database.db
     .insert(professors)
-    .values(professorFixtures)
+    .values(
+      professorFixtures.map(({ name, departmentIndex }) => ({
+        name,
+        departmentId: insertedDepartments[departmentIndex].id,
+      })),
+    )
     .returning({ id: professors.id });
+
+  const insertedCourses = await database.db
+    .insert(courses)
+    .values([
+      { name: "Curso Alfa", departmentId: insertedDepartments[0].id },
+      { name: "Curso Beta", departmentId: insertedDepartments[1].id },
+    ])
+    .returning({ id: courses.id });
+  const insertedDisciplines = await database.db
+    .insert(disciplines)
+    .values([
+      { code: "TST101", name: "Programação de Teste", departmentId: insertedDepartments[0].id, workloadHours: 64 },
+      { code: "TST102", name: "Banco de Teste", departmentId: insertedDepartments[0].id, workloadHours: 32 },
+      { code: "LAB201", name: "Laboratório Beta", departmentId: insertedDepartments[1].id, workloadHours: 48 },
+    ])
+    .returning({ id: disciplines.id });
+
+  await database.db.insert(courseDisciplines).values([
+    { courseId: insertedCourses[0].id, disciplineId: insertedDisciplines[0].id },
+    { courseId: insertedCourses[0].id, disciplineId: insertedDisciplines[1].id },
+    { courseId: insertedCourses[1].id, disciplineId: insertedDisciplines[0].id },
+    { courseId: insertedCourses[1].id, disciplineId: insertedDisciplines[2].id },
+  ]);
+  await database.db.insert(professorDisciplines).values([
+    { professorId: insertedProfessors[0].id, disciplineId: insertedDisciplines[0].id },
+    { professorId: insertedProfessors[1].id, disciplineId: insertedDisciplines[0].id },
+    { professorId: insertedProfessors[1].id, disciplineId: insertedDisciplines[2].id },
+  ]);
 
   await database.db.insert(reviews).values([
     {

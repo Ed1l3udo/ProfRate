@@ -10,6 +10,8 @@ O projeto exercita, em fatias pequenas, a integração entre persistência relac
 
 - listagem de professores fictícios;
 - detalhes de um professor;
+- catálogo fictício normalizado de departamentos, cursos e disciplinas;
+- listagem e detalhes de disciplinas com filtros persistidos na URL;
 - listagem de avaliações fictícias;
 - criação local de avaliações fictícias;
 - validação de parâmetros e corpos de requisição com respostas de erro previsíveis;
@@ -114,7 +116,7 @@ Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker comp
 ## Banco de dados
 
 - `db:migrate` aplica as migrations SQL geradas pelo Drizzle.
-- `db:seed` insere os três professores e as três avaliações fictícias conhecidas, sem duplicar esses dados controlados quando executado novamente.
+- `db:seed` insere o catálogo fictício com 3 departamentos, 3 cursos, 10 professores, 15 disciplinas e as três avaliações conhecidas, sem duplicar os dados controlados quando executado novamente.
 - `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
 - `db:generate` gera uma nova migration depois de uma alteração aprovada no schema Drizzle.
 
@@ -131,6 +133,12 @@ pnpm --filter @profrate/api db:generate
 | GET | `/professors/:id` | Professor com `id`, `name` e `department` |
 | GET | `/professors/:id/reviews` | Lista de avaliações com `id`, `professorId`, `rating` e `comment` |
 | POST | `/professors/:id/reviews` | Cria uma avaliação fictícia e responde `201` com o registro criado |
+| PATCH | `/professors/:professorId/reviews/:reviewId` | Atualiza parcialmente uma avaliação fictícia |
+| DELETE | `/professors/:professorId/reviews/:reviewId` | Exclui uma avaliação fictícia e responde `204` |
+| GET | `/departments` | Lista os departamentos fictícios |
+| GET | `/courses` | Lista os cursos; aceita `departmentId` |
+| GET | `/disciplines` | Lista disciplinas; aceita `search`, `departmentId` e `courseId` |
+| GET | `/disciplines/:id` | Detalha a disciplina, seus cursos e professores relacionados |
 
 O corpo de `POST /professors/:id/reviews` deve conter `rating` inteiro de 1 a 5 e `comment` não vazio. A API responde `400` para ID ou corpo inválido, `404` quando o professor não existe e `400` com erro específico para JSON malformado.
 

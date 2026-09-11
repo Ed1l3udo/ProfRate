@@ -1,11 +1,98 @@
 import { sql } from "drizzle-orm";
-import { check, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
-export const professors = pgTable("professors", {
+export const departments = pgTable("departments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  name: text("name").notNull(),
-  department: text("department").notNull(),
+  name: text("name").notNull().unique(),
 });
+
+export const professors = pgTable(
+  "professors",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    name: text("name").notNull(),
+    departmentId: integer("department_id")
+      .notNull()
+      .references(() => departments.id),
+  },
+  (table) => [index("professors_department_id_idx").on(table.departmentId)],
+);
+
+export const courses = pgTable(
+  "courses",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    name: text("name").notNull(),
+    departmentId: integer("department_id")
+      .notNull()
+      .references(() => departments.id),
+  },
+  (table) => [
+    uniqueIndex("courses_name_department_id_unique").on(
+      table.name,
+      table.departmentId,
+    ),
+    index("courses_department_id_idx").on(table.departmentId),
+  ],
+);
+
+export const disciplines = pgTable(
+  "disciplines",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    code: text("code").notNull().unique(),
+    name: text("name").notNull(),
+    departmentId: integer("department_id")
+      .notNull()
+      .references(() => departments.id),
+    workloadHours: integer("workload_hours").notNull(),
+  },
+  (table) => [
+    check("disciplines_workload_hours_positive", sql`${table.workloadHours} > 0`),
+    index("disciplines_department_id_idx").on(table.departmentId),
+  ],
+);
+
+export const professorDisciplines = pgTable(
+  "professor_disciplines",
+  {
+    professorId: integer("professor_id")
+      .notNull()
+      .references(() => professors.id, { onDelete: "cascade" }),
+    disciplineId: integer("discipline_id")
+      .notNull()
+      .references(() => disciplines.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.professorId, table.disciplineId] }),
+    index("professor_disciplines_discipline_id_idx").on(table.disciplineId),
+  ],
+);
+
+export const courseDisciplines = pgTable(
+  "course_disciplines",
+  {
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    disciplineId: integer("discipline_id")
+      .notNull()
+      .references(() => disciplines.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.courseId, table.disciplineId] }),
+    index("course_disciplines_discipline_id_idx").on(table.disciplineId),
+  ],
+);
 
 export const reviews = pgTable(
   "reviews",

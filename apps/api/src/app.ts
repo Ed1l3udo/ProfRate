@@ -3,6 +3,20 @@ import express, {
   type Request,
   type Response,
 } from "express";
+import type { CoursesRepository } from "./modules/courses/repository.js";
+import {
+  courseFiltersSchema,
+  invalidCourseFiltersError,
+} from "./modules/courses/schemas.js";
+import type { DepartmentsRepository } from "./modules/departments/repository.js";
+import type { DisciplinesRepository } from "./modules/disciplines/repository.js";
+import {
+  disciplineFiltersSchema,
+  disciplineIdParamsSchema,
+  disciplineNotFoundError,
+  invalidDisciplineFiltersError,
+  invalidDisciplineIdError,
+} from "./modules/disciplines/schemas.js";
 import {
   invalidProfessorIdError,
   invalidProfessorFiltersError,
@@ -45,6 +59,10 @@ export function createApp({
   listReviewsByProfessorId,
   deleteReview,
   updateReview,
+  findDisciplineById = async () => undefined,
+  listCourses = async () => [],
+  listDepartments = async () => [],
+  listDisciplines = async () => [],
 }: {
   createReview: ReviewsRepository["createReview"];
   findProfessorById: ProfessorsRepository["findProfessorById"];
@@ -52,6 +70,10 @@ export function createApp({
   listReviewsByProfessorId: ReviewsRepository["listReviewsByProfessorId"];
   deleteReview: ReviewsRepository["deleteReview"];
   updateReview: ReviewsRepository["updateReview"];
+  findDisciplineById?: DisciplinesRepository["findDisciplineById"];
+  listCourses?: CoursesRepository["listCourses"];
+  listDepartments?: DepartmentsRepository["listDepartments"];
+  listDisciplines?: DisciplinesRepository["listDisciplines"];
 }) {
   const app = express();
 
@@ -59,6 +81,52 @@ export function createApp({
 
   app.get("/health", (_request, response) => {
     response.status(200).json({ status: "ok" });
+  });
+
+  app.get("/departments", async (_request, response) => {
+    const departments = await listDepartments();
+
+    return response.status(200).json(departments);
+  });
+
+  app.get("/courses", async (request, response) => {
+    const parsedFilters = courseFiltersSchema.safeParse(request.query);
+
+    if (!parsedFilters.success) {
+      return response.status(400).json({ error: invalidCourseFiltersError });
+    }
+
+    const courses = await listCourses(parsedFilters.data);
+
+    return response.status(200).json(courses);
+  });
+
+  app.get("/disciplines", async (request, response) => {
+    const parsedFilters = disciplineFiltersSchema.safeParse(request.query);
+
+    if (!parsedFilters.success) {
+      return response.status(400).json({ error: invalidDisciplineFiltersError });
+    }
+
+    const disciplines = await listDisciplines(parsedFilters.data);
+
+    return response.status(200).json(disciplines);
+  });
+
+  app.get("/disciplines/:id", async (request, response) => {
+    const parsedParams = disciplineIdParamsSchema.safeParse(request.params);
+
+    if (!parsedParams.success) {
+      return response.status(400).json({ error: invalidDisciplineIdError });
+    }
+
+    const discipline = await findDisciplineById(parsedParams.data.id);
+
+    if (discipline === undefined) {
+      return response.status(404).json({ error: disciplineNotFoundError });
+    }
+
+    return response.status(200).json(discipline);
   });
 
   app.get("/professors", async (request, response) => {
