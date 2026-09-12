@@ -288,6 +288,7 @@ it("recalculates review aggregates after create, update, and delete", async () =
 
   const createdReview = await reviewsRepository.createReview({
     professorId: 1,
+    authorId: 1,
     rating: 1,
     comment: "Avaliação temporária para recalcular o resumo.",
   });
@@ -298,6 +299,7 @@ it("recalculates review aggregates after create, update, and delete", async () =
 
   await reviewsRepository.updateReview({
     professorId: 1,
+    authorId: 1,
     reviewId: createdReview.id,
     rating: 4,
   });
@@ -306,7 +308,7 @@ it("recalculates review aggregates after create, update, and delete", async () =
   expect(afterUpdate.reviewCount).toBe(3);
   expect(afterUpdate.averageRating).toBeCloseTo(13 / 3);
 
-  await reviewsRepository.deleteReview({ professorId: 1, reviewId: createdReview.id });
+  await reviewsRepository.deleteReview({ professorId: 1, reviewId: createdReview.id, authorId: 1 });
 
   await expect(
     professorsRepository.listProfessors({ search: "Alice" }),
@@ -337,6 +339,7 @@ it("lists reviews ordered by id", async () => {
       comment: "Primeira avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
       updatedAt: reviewFixtureTimestamp,
+      canManage: false,
     },
     {
       id: 2,
@@ -345,6 +348,7 @@ it("lists reviews ordered by id", async () => {
       comment: "Segunda avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
       updatedAt: reviewFixtureTimestamp,
+      canManage: false,
     },
   ]);
 });
@@ -354,6 +358,7 @@ it("creates a review and returns the persisted columns", async () => {
 
   const review = await reviewsRepository.createReview({
     professorId: 3,
+    authorId: 1,
     rating: 2,
     comment: "Avaliação criada no teste.",
   });
@@ -365,10 +370,11 @@ it("creates a review and returns the persisted columns", async () => {
     comment: "Avaliação criada no teste.",
     createdAt: expect.any(Date),
     updatedAt: expect.any(Date),
+    canManage: true,
   });
   expect(Number.isFinite(review.createdAt.getTime())).toBe(true);
   expect(review.updatedAt.getTime()).toBe(review.createdAt.getTime());
-  await expect(reviewsRepository.listReviewsByProfessorId(3))
+  await expect(reviewsRepository.listReviewsByProfessorId(3, 1))
     .resolves.toStrictEqual([review]);
 });
 
@@ -377,6 +383,7 @@ it("persists exactly 500 comment code points through the repository", async () =
   const comment = "🙂".repeat(500);
   const review = await reviewsRepository.createReview({
     professorId: 3,
+    authorId: 1,
     rating: 5,
     comment,
   });
@@ -410,6 +417,7 @@ it("partially updates a review", async () => {
 
   const review = await reviewsRepository.updateReview({
     professorId: 1,
+    authorId: 1,
     reviewId: 1,
     rating: 2,
   });
@@ -421,9 +429,10 @@ it("partially updates a review", async () => {
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: expect.any(Date),
+    canManage: true,
   });
   expect(review?.updatedAt.getTime()).toBeGreaterThan(reviewFixtureTimestamp.getTime());
-  await expect(reviewsRepository.listReviewsByProfessorId(1))
+  await expect(reviewsRepository.listReviewsByProfessorId(1, 1))
     .resolves.toContainEqual(review);
 });
 
@@ -433,6 +442,7 @@ it("does not update a review through another professor", async () => {
   await expect(
     reviewsRepository.updateReview({
       professorId: 2,
+      authorId: 1,
       reviewId: 1,
       rating: 1,
     }),
@@ -446,6 +456,7 @@ it("does not update a review through another professor", async () => {
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: reviewFixtureTimestamp,
+    canManage: false,
   });
 });
 
@@ -453,7 +464,7 @@ it("deletes a review", async () => {
   const { reviewsRepository } = getIntegrationContext();
 
   await expect(
-    reviewsRepository.deleteReview({ professorId: 1, reviewId: 1 }),
+    reviewsRepository.deleteReview({ professorId: 1, reviewId: 1, authorId: 1 }),
   ).resolves.toStrictEqual({
     id: 1,
     professorId: 1,
@@ -471,7 +482,7 @@ it("does not delete a review through another professor", async () => {
   const { reviewsRepository } = getIntegrationContext();
 
   await expect(
-    reviewsRepository.deleteReview({ professorId: 2, reviewId: 1 }),
+    reviewsRepository.deleteReview({ professorId: 2, reviewId: 1, authorId: 1 }),
   ).resolves.toBeUndefined();
   await expect(
     reviewsRepository.listReviewsByProfessorId(1),
@@ -482,6 +493,7 @@ it("does not delete a review through another professor", async () => {
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: reviewFixtureTimestamp,
+    canManage: false,
   });
 });
 
@@ -492,6 +504,7 @@ it("rejects a review for a missing professor through the foreign key", async () 
     () =>
       reviewsRepository.createReview({
         professorId: 999_999,
+        authorId: 1,
         rating: 5,
         comment: "Professor inexistente.",
       }),
@@ -508,6 +521,7 @@ it.each([0, 6])(
       () =>
         reviewsRepository.createReview({
           professorId: 1,
+          authorId: 1,
           rating,
           comment: "Nota inválida.",
         }),

@@ -11,6 +11,7 @@ const currentDependencies = {
     comment: "Teste",
     createdAt: new Date(),
     updatedAt: new Date(),
+    canManage: true,
   }),
   deleteReview: async () => undefined,
   findProfessorById: async () => undefined,

@@ -1,5 +1,6 @@
 import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
+import express from "express";
 
 import { createApp as createAppWithDependencies } from "../src/app.js";
 
@@ -9,10 +10,35 @@ function createApp(
   dependencies: Omit<AppDependencies, "updateReview"> &
     Partial<Pick<AppDependencies, "updateReview">>,
 ) {
-  return createAppWithDependencies({
+  const innerApp = createAppWithDependencies({
+    findReviewOwnership: async () => ({ authorId: 1 }),
+    findUserById: async () => ({
+      id: 1,
+      name: "Aluno Teste",
+      email: "aluno@profrate.test",
+      passwordHash: "hash-de-teste",
+      role: "student",
+      courseId: 1,
+      course: { id: 1, name: "Curso Teste" },
+      active: true,
+      createdAt: new Date("2025-01-10T12:00:00.000Z"),
+      updatedAt: new Date("2025-01-10T12:00:00.000Z"),
+    }),
     updateReview: async () => undefined,
+    verifyToken: async () => ({ userId: 1, role: "student" }),
     ...dependencies,
   });
+  const app = express();
+
+  app.use((request, _response, next) => {
+    if (request.method !== "GET") {
+      request.headers.authorization = "Bearer test-token";
+    }
+    next();
+  });
+  app.use(innerApp);
+
+  return app;
 }
 
 const testReview = {
@@ -22,6 +48,7 @@ const testReview = {
   comment: "",
   createdAt: new Date("2025-01-10T12:00:00.000Z"),
   updatedAt: new Date("2025-01-10T12:00:00.000Z"),
+  canManage: true,
 };
 
 describe("GET /professors", () => {
@@ -387,6 +414,7 @@ describe("POST /professors/:id/reviews", () => {
     expect(createReview).toHaveBeenCalledOnce();
     expect(createReview).toHaveBeenCalledWith({
       professorId: 1,
+      authorId: 1,
       rating: 5,
       comment: "Explicações muito claras.",
     });
@@ -423,6 +451,7 @@ describe("POST /professors/:id/reviews", () => {
     expect(Array.from(normalizedComment)).toHaveLength(500);
     expect(createReview).toHaveBeenCalledWith({
       professorId: 1,
+      authorId: 1,
       rating: 5,
       comment: normalizedComment,
     });
@@ -630,7 +659,7 @@ describe("DELETE /professors/:professorId/reviews/:reviewId", () => {
     expect(response.status).toBe(204);
     expect(response.text).toBe("");
     expect(findProfessorById).toHaveBeenCalledWith(1);
-    expect(deleteReview).toHaveBeenCalledWith({ professorId: 1, reviewId: 4 });
+    expect(deleteReview).toHaveBeenCalledWith({ professorId: 1, reviewId: 4, authorId: 1 });
   });
 
   it.each([
@@ -676,7 +705,7 @@ describe("DELETE /professors/:professorId/reviews/:reviewId", () => {
     expect(response.body).toStrictEqual({
       error: { code: "REVIEW_NOT_FOUND", message: "Review not found." },
     });
-    expect(deleteReview).toHaveBeenCalledWith({ professorId: 1, reviewId: 999 });
+    expect(deleteReview).toHaveBeenCalledWith({ professorId: 1, reviewId: 999, authorId: 1 });
   });
 
   it("returns review not found when the review belongs to another professor", async () => {
@@ -694,7 +723,7 @@ describe("DELETE /professors/:professorId/reviews/:reviewId", () => {
     expect(response.body).toStrictEqual({
       error: { code: "REVIEW_NOT_FOUND", message: "Review not found." },
     });
-    expect(deleteReview).toHaveBeenCalledWith({ professorId: 2, reviewId: 1 });
+    expect(deleteReview).toHaveBeenCalledWith({ professorId: 2, reviewId: 1, authorId: 1 });
   });
 });
 
@@ -743,6 +772,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     expect(findProfessorById).toHaveBeenCalledWith(1);
     expect(updateReview).toHaveBeenCalledWith({
       professorId: 1,
+      authorId: 1,
       reviewId: 1,
       rating: 5,
       comment: "Comentário atualizado.",
@@ -767,6 +797,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     expect(response.status).toBe(200);
     expect(updateReview).toHaveBeenCalledWith({
       professorId: 1,
+      authorId: 1,
       reviewId: 1,
       rating: 3,
     });
@@ -790,6 +821,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     expect(response.status).toBe(200);
     expect(updateReview).toHaveBeenCalledWith({
       professorId: 1,
+      authorId: 1,
       reviewId: 1,
       comment: "Somente comentário.",
     });
@@ -809,6 +841,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     expect(response.status).toBe(200);
     expect(updateReview).toHaveBeenCalledWith({
       professorId: 1,
+      authorId: 1,
       reviewId: 1,
       comment,
     });
@@ -940,6 +973,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     });
     expect(updateReview).toHaveBeenCalledWith({
       professorId,
+      authorId: 1,
       reviewId,
       rating: 5,
     });

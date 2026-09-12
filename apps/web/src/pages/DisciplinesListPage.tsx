@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 
+import { useAuth } from "../auth/AuthContext.js";
 import type { Course, Department, DisciplineListItem } from "../types/discipline.js";
 import {
   createDisciplineSearchParams,
@@ -11,6 +12,7 @@ import {
 type LoadState = "loading" | "success" | "error";
 
 export function DisciplinesListPage() {
+  const { apiFetch } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const appliedFilters = readDisciplineFilters(searchParams);
   const canonicalSearchParams = createDisciplineSearchParams(appliedFilters).toString();
@@ -33,8 +35,8 @@ export function DisciplinesListPage() {
     async function loadOptions() {
       try {
         const [departmentsResponse, coursesResponse] = await Promise.all([
-          fetch("/api/departments", { signal: controller.signal }),
-          fetch("/api/courses", { signal: controller.signal }),
+          apiFetch("/api/departments", { signal: controller.signal }),
+          apiFetch("/api/courses", { signal: controller.signal }),
         ]);
 
         if (!departmentsResponse.ok || !coursesResponse.ok) throw new Error();
@@ -55,7 +57,7 @@ export function DisciplinesListPage() {
 
     void loadOptions();
     return () => controller.abort();
-  }, []);
+  }, [apiFetch]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -66,7 +68,7 @@ export function DisciplinesListPage() {
         const url = canonicalSearchParams === ""
           ? "/api/disciplines"
           : `/api/disciplines?${canonicalSearchParams}`;
-        const response = await fetch(url, { signal: controller.signal });
+        const response = await apiFetch(url, { signal: controller.signal });
 
         if (!response.ok) throw new Error();
         const data = (await response.json()) as DisciplineListItem[];
@@ -82,7 +84,7 @@ export function DisciplinesListPage() {
 
     void loadDisciplines();
     return () => controller.abort();
-  }, [canonicalSearchParams]);
+  }, [apiFetch, canonicalSearchParams]);
 
   function updateInput(name: keyof DisciplineFilters, value: string) {
     setInputs((current) => ({ ...current, [name]: value }));

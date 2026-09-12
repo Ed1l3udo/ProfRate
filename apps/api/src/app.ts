@@ -3,6 +3,27 @@ import express, {
   type Request,
   type Response,
 } from "express";
+import {
+  authenticatedUser,
+  createAuthenticationMiddleware,
+  userBlockedError,
+} from "./modules/auth/middleware.js";
+import {
+  DUMMY_PASSWORD_HASH,
+  type PasswordService,
+} from "./modules/auth/password.js";
+import {
+  courseNotFoundError,
+  emailAlreadyRegisteredError,
+  invalidCredentialsError,
+  invalidLoginInputError,
+  invalidProfileUpdateError,
+  invalidSignupInputError,
+  loginBodySchema,
+  signupBodySchema,
+  updateProfileBodySchema,
+} from "./modules/auth/schemas.js";
+import type { TokenService } from "./modules/auth/token.js";
 import type { CoursesRepository } from "./modules/courses/repository.js";
 import {
   courseFiltersSchema,
@@ -33,9 +54,14 @@ import {
   createReviewBodySchema,
   reviewIdParamsSchema,
   reviewNotFoundError,
+  reviewNotOwnedError,
   updateReviewBodySchema,
 } from "./modules/reviews/schemas.js";
 import type { ReviewsRepository } from "./modules/reviews/repository.js";
+import {
+  publicUser,
+  type UsersRepository,
+} from "./modules/users/repository.js";
 
 function isJsonParsingError(error: unknown): error is SyntaxError & {
   status: number;
@@ -63,6 +89,19 @@ export function createApp({
   listCourses = async () => [],
   listDepartments = async () => [],
   listDisciplines = async () => [],
+  createStudent = async () => undefined,
+  findCourseById = async () => undefined,
+  findReviewOwnership = async () => undefined,
+  findUserByEmail = async () => undefined,
+  findUserById = async () => undefined,
+  hashPassword = async () => "",
+  listReviewsByAuthorId = async () => [],
+  signToken = async () => "",
+  updateProfile = async () => undefined,
+  verifyPassword = async () => false,
+  verifyToken = async () => {
+    throw new Error("Token service is not configured.");
+  },
 }: {
   createReview: ReviewsRepository["createReview"];
   findProfessorById: ProfessorsRepository["findProfessorById"];
@@ -74,14 +113,121 @@ export function createApp({
   listCourses?: CoursesRepository["listCourses"];
   listDepartments?: DepartmentsRepository["listDepartments"];
   listDisciplines?: DisciplinesRepository["listDisciplines"];
+  createStudent?: UsersRepository["createStudent"];
+  findCourseById?: CoursesRepository["findCourseById"];
+  findReviewOwnership?: ReviewsRepository["findReviewOwnership"];
+  findUserByEmail?: UsersRepository["findUserByEmail"];
+  findUserById?: UsersRepository["findUserById"];
+  hashPassword?: PasswordService["hashPassword"];
+  listReviewsByAuthorId?: ReviewsRepository["listReviewsByAuthorId"];
+  signToken?: TokenService["signToken"];
+  updateProfile?: UsersRepository["updateProfile"];
+  verifyPassword?: PasswordService["verifyPassword"];
+  verifyToken?: TokenService["verifyToken"];
 }) {
   const app = express();
+  const {
+    optionalAuthentication,
+    requireAuthentication,
+    requireStudent,
+  } = createAuthenticationMiddleware({ findUserById, verifyToken });
 
   app.use(express.json());
 
   app.get("/health", (_request, response) => {
     response.status(200).json({ status: "ok" });
   });
+
+  app.post("/auth/signup", async (request, response) => {
+    const parsedBody = signupBodySchema.safeParse(request.body);
+
+    if (!parsedBody.success) {
+      return response.status(400).json({ error: invalidSignupInputError });
+    }
+
+    const course = await findCourseById(parsedBody.data.courseId);
+    if (course === undefined) {
+      return response.status(404).json({ error: courseNotFoundError });
+    }
+
+    const passwordHash = await hashPassword(parsedBody.data.password);
+    const user = await createStudent({
+      name: parsedBody.data.name,
+      email: parsedBody.data.email,
+      passwordHash,
+      courseId: parsedBody.data.courseId,
+    });
+
+    if (user === undefined) {
+      return response.status(409).json({ error: emailAlreadyRegisteredError });
+    }
+
+    const token = await signToken({ userId: user.id, role: user.role });
+    return response.status(201).json({ user: publicUser(user), token });
+  });
+
+  app.post("/auth/login", async (request, response) => {
+    const parsedBody = loginBodySchema.safeParse(request.body);
+
+    if (!parsedBody.success) {
+      return response.status(400).json({ error: invalidLoginInputError });
+    }
+
+    const user = await findUserByEmail(parsedBody.data.email);
+    const passwordMatches = await verifyPassword(
+      parsedBody.data.password,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+    );
+
+    if (user === undefined || !passwordMatches) {
+      return response.status(401).json({ error: invalidCredentialsError });
+    }
+
+    if (!user.active) {
+      return response.status(403).json({ error: userBlockedError });
+    }
+
+    const token = await signToken({ userId: user.id, role: user.role });
+    return response.status(200).json({ user: publicUser(user), token });
+  });
+
+  app.get("/me", requireAuthentication, (_request, response) => {
+    return response.status(200).json(publicUser(authenticatedUser(response)));
+  });
+
+  app.patch("/me", requireAuthentication, async (request, response) => {
+    const parsedBody = updateProfileBodySchema.safeParse(request.body);
+    const user = authenticatedUser(response);
+
+    if (!parsedBody.success || (user.role === "moderator" && parsedBody.data.courseId !== undefined)) {
+      return response.status(400).json({ error: invalidProfileUpdateError });
+    }
+
+    if (parsedBody.data.courseId !== undefined) {
+      const course = await findCourseById(parsedBody.data.courseId);
+      if (course === undefined) {
+        return response.status(404).json({ error: courseNotFoundError });
+      }
+    }
+
+    const updatedUser = await updateProfile({ id: user.id, ...parsedBody.data });
+    if (updatedUser === undefined) {
+      return response.status(401).json({ error: invalidCredentialsError });
+    }
+
+    return response.status(200).json(publicUser(updatedUser));
+  });
+
+  app.get(
+    "/me/reviews",
+    requireAuthentication,
+    requireStudent,
+    async (_request, response) => {
+      const user = authenticatedUser(response);
+      const reviews = await listReviewsByAuthorId(user.id);
+      return response.status(200).json(reviews);
+    },
+  );
 
   app.get("/departments", async (_request, response) => {
     const departments = await listDepartments();
@@ -163,7 +309,10 @@ export function createApp({
     return response.status(200).json(professor);
   });
 
-  app.get("/professors/:id/reviews", async (request, response) => {
+  app.get(
+    "/professors/:id/reviews",
+    optionalAuthentication,
+    async (request, response) => {
     const parsedParams = professorIdParamsSchema.safeParse(request.params);
 
     if (!parsedParams.success) {
@@ -180,12 +329,22 @@ export function createApp({
       });
     }
 
-    const reviews = await listReviewsByProfessorId(parsedParams.data.id);
+    const viewer = response.locals.authUser as
+      | ReturnType<typeof authenticatedUser>
+      | undefined;
+    const reviews = viewer?.role === "student"
+      ? await listReviewsByProfessorId(parsedParams.data.id, viewer.id)
+      : await listReviewsByProfessorId(parsedParams.data.id);
 
     return response.status(200).json(reviews);
-  });
+    },
+  );
 
-  app.post("/professors/:id/reviews", async (request, response) => {
+  app.post(
+    "/professors/:id/reviews",
+    requireAuthentication,
+    requireStudent,
+    async (request, response) => {
     const parsedParams = professorIdParamsSchema.safeParse(request.params);
 
     if (!parsedParams.success) {
@@ -214,13 +373,17 @@ export function createApp({
       professorId: parsedParams.data.id,
       rating: parsedBody.data.rating,
       comment: parsedBody.data.comment,
+      authorId: authenticatedUser(response).id,
     });
 
     return response.status(201).json(review);
-  });
+    },
+  );
 
   app.delete(
     "/professors/:professorId/reviews/:reviewId",
+    requireAuthentication,
+    requireStudent,
     async (request, response) => {
       const parsedProfessorId = professorIdParamsSchema.safeParse({
         id: request.params.professorId,
@@ -250,15 +413,30 @@ export function createApp({
         });
       }
 
-      const deletedReview = await deleteReview({
+      const ownership = await findReviewOwnership({
         professorId: parsedProfessorId.data.id,
         reviewId: parsedReviewId.data.reviewId,
       });
 
-      if (deletedReview === undefined) {
+      if (ownership === undefined) {
         return response.status(404).json({
           error: reviewNotFoundError,
         });
+      }
+
+      const user = authenticatedUser(response);
+      if (ownership.authorId !== user.id) {
+        return response.status(403).json({ error: reviewNotOwnedError });
+      }
+
+      const deletedReview = await deleteReview({
+        professorId: parsedProfessorId.data.id,
+        reviewId: parsedReviewId.data.reviewId,
+        authorId: user.id,
+      });
+
+      if (deletedReview === undefined) {
+        return response.status(404).json({ error: reviewNotFoundError });
       }
 
       return response.status(204).send();
@@ -267,6 +445,8 @@ export function createApp({
 
   app.patch(
     "/professors/:professorId/reviews/:reviewId",
+    requireAuthentication,
+    requireStudent,
     async (request, response) => {
       const parsedProfessorId = professorIdParamsSchema.safeParse({
         id: request.params.professorId,
@@ -296,9 +476,24 @@ export function createApp({
         return response.status(404).json({ error: professorNotFoundError });
       }
 
+      const ownership = await findReviewOwnership({
+        professorId: parsedProfessorId.data.id,
+        reviewId: parsedReviewId.data.reviewId,
+      });
+
+      if (ownership === undefined) {
+        return response.status(404).json({ error: reviewNotFoundError });
+      }
+
+      const user = authenticatedUser(response);
+      if (ownership.authorId !== user.id) {
+        return response.status(403).json({ error: reviewNotOwnedError });
+      }
+
       const updatedReview = await updateReview({
         professorId: parsedProfessorId.data.id,
         reviewId: parsedReviewId.data.reviewId,
+        authorId: user.id,
         ...parsedBody.data,
       });
 

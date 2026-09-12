@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router";
 
+import { useAuth } from "../auth/AuthContext.js";
 import { ReviewForm } from "./ReviewForm.js";
 import { ReviewItem } from "./ReviewItem.js";
 import type { Review } from "../types/professor.js";
@@ -48,6 +50,8 @@ function deriveVisibleReviews(
 }
 
 export function ProfessorReviews({ professorId }: { professorId: number }) {
+  const { apiFetch, status, user } = useAuth();
+  const location = useLocation();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>("all");
@@ -63,7 +67,7 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
 
     async function loadReviews() {
       try {
-        const response = await fetch(`/api/professors/${professorId}/reviews`, {
+        const response = await apiFetch(`/api/professors/${professorId}/reviews`, {
           signal: controller.signal,
         });
 
@@ -96,7 +100,7 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
     return () => {
       controller.abort();
     };
-  }, [professorId]);
+  }, [apiFetch, professorId]);
 
   function handleReviewCreated(review: Review) {
     setReviews((currentReviews) => [...currentReviews, review]);
@@ -198,8 +202,17 @@ export function ProfessorReviews({ professorId }: { professorId: number }) {
           ))}
         </ul>
       ) : null}
-      {loadState === "success" ? (
+      {loadState === "success" && status === "authenticated" && user?.role === "student" ? (
         <ReviewForm professorId={professorId} onReviewCreated={handleReviewCreated} />
+      ) : null}
+      {loadState === "success" && status === "anonymous" ? (
+        <p className="review-auth-invite">
+          <Link to="/login" state={{ from: `${location.pathname}${location.search}` }}>Entre</Link>
+          {" para publicar uma avaliação."}
+        </p>
+      ) : null}
+      {loadState === "success" && status === "authenticated" && user?.role === "moderator" ? (
+        <p className="review-auth-invite">Contas de moderação não publicam avaliações.</p>
       ) : null}
     </section>
   );

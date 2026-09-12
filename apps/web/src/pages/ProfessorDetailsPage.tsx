@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 
+import { useAuth } from "../auth/AuthContext.js";
 import { ProfessorReviews } from "../components/ProfessorReviews.js";
 import type { ProfessorDetails } from "../types/professor.js";
 import {
@@ -11,6 +12,7 @@ import {
 type LoadState = "loading" | "success" | "not-found" | "invalid-id" | "error";
 
 export function ProfessorDetailsPage() {
+  const { apiFetch } = useAuth();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const returnSearchParams = createProfessorSearchParams(
@@ -34,7 +36,7 @@ export function ProfessorDetailsPage() {
 
     async function loadProfessor() {
       try {
-        const response = await fetch(`/api/professors/${id}`, {
+        const response = await apiFetch(`/api/professors/${id}`, {
           signal: controller.signal,
         });
 
@@ -77,7 +79,7 @@ export function ProfessorDetailsPage() {
     return () => {
       controller.abort();
     };
-  }, [id]);
+  }, [apiFetch, id]);
 
   if (loadState === "loading") {
     return <p className="state-message">Carregando professor...</p>;

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 
+import { useAuth } from "../auth/AuthContext.js";
 import type { DisciplineDetails } from "../types/discipline.js";
 import { createDisciplineSearchParams, readDisciplineFilters } from "../utils/disciplineFilters.js";
 
 type LoadState = "loading" | "success" | "not-found" | "invalid-id" | "error";
 
 export function DisciplineDetailsPage() {
+  const { apiFetch } = useAuth();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const returnParams = createDisciplineSearchParams(
@@ -29,7 +31,7 @@ export function DisciplineDetailsPage() {
 
     async function loadDiscipline() {
       try {
-        const response = await fetch(`/api/disciplines/${id}`, { signal: controller.signal });
+        const response = await apiFetch(`/api/disciplines/${id}`, { signal: controller.signal });
         if (controller.signal.aborted) return;
         if (response.status === 404) return setLoadState("not-found");
         if (response.status === 400) return setLoadState("invalid-id");
@@ -47,7 +49,7 @@ export function DisciplineDetailsPage() {
 
     void loadDiscipline();
     return () => controller.abort();
-  }, [id]);
+  }, [apiFetch, id]);
 
   if (loadState === "success" && discipline !== null) {
     return (

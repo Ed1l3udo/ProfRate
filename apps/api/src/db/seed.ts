@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { closeDatabase, db } from "./client.js";
+import { createPasswordService } from "../modules/auth/password.js";
 import {
   courseDisciplines,
   courses,
@@ -9,7 +10,10 @@ import {
   professorDisciplines,
   professors,
   reviews,
+  users,
 } from "./schema.js";
+
+const passwordService = createPasswordService();
 
 const seedDepartments = [
   "Departamento Aurora",
@@ -77,6 +81,23 @@ const seedReviews = [
   { professorName: "Ada Ribeiro", rating: 5, comment: "Explicações claras e atividades bem organizadas." },
   { professorName: "Ada Ribeiro", rating: 4, comment: "Feedbacks úteis durante os exercícios." },
   { professorName: "Caio Nogueira", rating: 4, comment: "Aulas objetivas e exemplos práticos." },
+];
+
+const seedUsers = [
+  {
+    name: "Ana Exemplo",
+    email: "ana@student.profrate.test",
+    password: "ProfRate#2026Aluno",
+    role: "student" as const,
+    course: "Computação Aplicada",
+  },
+  {
+    name: "Mauro Moderador",
+    email: "moderador@profrate.test",
+    password: "ProfRate#2026Moderador",
+    role: "moderator" as const,
+    course: null,
+  },
 ];
 
 function requiredId(map: Map<string, number>, key: string, entity: string) {
@@ -168,6 +189,27 @@ try {
       })),
     );
     await transaction.insert(professorDisciplines).values(professorRelations).onConflictDoNothing();
+
+    for (const user of seedUsers) {
+      const existingUser = await transaction
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, user.email))
+        .limit(1);
+
+      if (existingUser.length === 0) {
+        const passwordHash = await passwordService.hashPassword(user.password);
+        await transaction.insert(users).values({
+          name: user.name,
+          email: user.email,
+          passwordHash,
+          role: user.role,
+          courseId: user.course === null
+            ? null
+            : requiredId(courseIds, user.course, "course"),
+        });
+      }
+    }
 
     const existingReviews = await transaction
       .select({ professorId: reviews.professorId, rating: reviews.rating, comment: reviews.comment })

@@ -46,6 +46,11 @@ export const reviewNotFoundError = {
   message: "Review not found.",
 };
 
+export const reviewNotOwnedError = {
+  code: "REVIEW_NOT_OWNED",
+  message: "You can only manage your own reviews.",
+};
+
 export const invalidReviewUpdateError = {
   code: "INVALID_REVIEW_UPDATE",
   message:

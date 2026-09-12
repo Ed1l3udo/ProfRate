@@ -13,6 +13,7 @@ describe("GET /health", () => {
         comment: "",
         createdAt: new Date("2025-01-10T12:00:00.000Z"),
         updatedAt: new Date("2025-01-10T12:00:00.000Z"),
+        canManage: true,
       }),
       deleteReview: async () => undefined,
       findProfessorById: async () => undefined,

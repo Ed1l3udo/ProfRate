@@ -42,11 +42,26 @@ select:focus-visible {
 
 .main-navigation {
   display: flex;
-  justify-content: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #d9e3ec;
   background: #ffffff;
+}
+
+.main-navigation-links,
+.main-navigation-session {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.main-navigation-session span {
+  color: #617286;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .main-navigation a {
@@ -59,6 +74,20 @@ select:focus-visible {
 .main-navigation a[aria-current="page"] {
   background: #176b87;
   color: #ffffff;
+}
+
+.main-navigation button {
+  border: 1px solid #176b87;
+  border-radius: 0.45rem;
+  background: #ffffff;
+  padding: 0.5rem 0.8rem;
+  color: #176b87;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.main-navigation button:hover {
+  background: #eef6f8;
 }
 
 .page-shell {
@@ -449,6 +478,97 @@ h3 {
   border-top: 1px solid #e3eaf1;
 }
 
+.review-auth-invite {
+  margin: 1.5rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e3eaf1;
+  color: #617286;
+}
+
+.my-review-professor {
+  margin-bottom: 0.75rem;
+  font-size: 1.1rem;
+}
+
+.auth-page {
+  width: min(100% - 2rem, 34rem);
+}
+
+.auth-page > p:last-child {
+  text-align: center;
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border: 1px solid #d9e3ec;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 0.35rem 1rem rgb(22 50 79 / 6%);
+}
+
+.auth-form input,
+.auth-form select {
+  width: 100%;
+  border: 1px solid #aebdca;
+  border-radius: 0.45rem;
+  background: #ffffff;
+  padding: 0.65rem 0.75rem;
+  color: #243447;
+}
+
+.auth-form small {
+  color: #617286;
+}
+
+.auth-form button {
+  justify-self: start;
+  margin-top: 0.5rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: #176b87;
+  padding: 0.7rem 1rem;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.auth-form button:hover:not(:disabled) {
+  background: #0e4f65;
+}
+
+.auth-form button:disabled {
+  background: #91a4b3;
+  cursor: not-allowed;
+}
+
+.account-summary {
+  display: grid;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+}
+
+.account-summary div {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #d9e3ec;
+  border-radius: 0.65rem;
+  background: #ffffff;
+}
+
+.account-summary dt {
+  color: #617286;
+  font-weight: 700;
+}
+
+.account-summary dd {
+  margin: 0;
+}
+
 .review-input {
   width: 100%;
   border: 1px solid #aebdca;
@@ -518,6 +638,16 @@ h3 {
 }
 
 @media (max-width: 38rem) {
+  .main-navigation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .main-navigation-links,
+  .main-navigation-session {
+    justify-content: center;
+  }
+
   .page-shell {
     padding: 2.25rem 0;
   }

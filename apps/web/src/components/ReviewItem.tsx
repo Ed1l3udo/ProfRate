@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 
-import type { Review } from "../types/professor.js";
+import { useAuth } from "../auth/AuthContext.js";
+import type { MyReview, Review } from "../types/professor.js";
 import {
   countReviewCommentCharacters,
   REVIEW_COMMENT_MAX_LENGTH,
@@ -16,15 +18,18 @@ const reviewDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 
 export function ReviewItem({
   professorId,
+  professor,
   review,
   onDeleted,
   onUpdated,
 }: {
   professorId: number;
+  professor?: MyReview["professor"];
   review: Review;
   onDeleted: (reviewId: number) => void;
   onUpdated: (review: Review) => void;
 }) {
+  const { apiFetch } = useAuth();
   const [isConfirming, setIsConfirming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteHasError, setDeleteHasError] = useState(false);
@@ -92,7 +97,7 @@ export function ReviewItem({
     setEditFeedback(null);
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/professors/${professorId}/reviews/${review.id}`,
         {
           method: "PATCH",
@@ -156,7 +161,7 @@ export function ReviewItem({
     setDeleteHasError(false);
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/professors/${professorId}/reviews/${review.id}`,
         { method: "DELETE", signal: controller.signal },
       );
@@ -188,6 +193,11 @@ export function ReviewItem({
 
   return (
     <li className="review-card">
+      {professor !== undefined ? (
+        <h2 className="my-review-professor">
+          <Link to={`/professors/${professor.id}`}>{professor.name}</Link>
+        </h2>
+      ) : null}
       {isEditing ? (
         <form className="review-edit-form" noValidate onSubmit={handleUpdate}>
           <label htmlFor={`review-rating-${review.id}`}>Nota</label>
@@ -259,7 +269,7 @@ export function ReviewItem({
           ) : null}
         </>
       )}
-      {!isEditing && !isConfirming ? (
+      {review.canManage && !isEditing && !isConfirming ? (
         <div className="review-actions">
           <button className="review-edit" type="button" onClick={beginEditing}>
             Editar avaliação
@@ -278,7 +288,7 @@ export function ReviewItem({
           </button>
         </div>
       ) : null}
-      {!isEditing && isConfirming ? (
+      {review.canManage && !isEditing && isConfirming ? (
         <div className="review-delete-confirmation">
           <p>Deseja excluir esta avaliação?</p>
           <button

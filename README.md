@@ -13,7 +13,9 @@ O projeto exercita, em fatias pequenas, a integração entre persistência relac
 - catálogo fictício normalizado de departamentos, cursos e disciplinas;
 - listagem e detalhes de disciplinas com filtros persistidos na URL;
 - listagem de avaliações fictícias;
-- criação local de avaliações fictícias;
+- cadastro e login local de alunos com sessão JWT;
+- autoria, criação, edição e exclusão das próprias avaliações fictícias;
+- área de conta e listagem das avaliações do aluno;
 - validação de parâmetros e corpos de requisição com respostas de erro previsíveis;
 - persistência em PostgreSQL por migrations e seed repetível;
 - interface web com estados de carregamento, sucesso, vazio e erro.
@@ -74,7 +76,7 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-Defina em `.env` uma senha local para `POSTGRES_PASSWORD` e use a mesma senha em `DATABASE_URL`.
+Defina em `.env` uma senha local para `POSTGRES_PASSWORD`, use a mesma senha em `DATABASE_URL` e substitua `AUTH_JWT_SECRET` por um segredo local com ao menos 32 caracteres. O servidor não inicia sem essa variável.
 
 Inicie o PostgreSQL:
 
@@ -120,6 +122,15 @@ Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker comp
 - `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
 - `db:generate` gera uma nova migration depois de uma alteração aprovada no schema Drizzle.
 
+O seed também cria duas contas exclusivamente locais e fictícias, sem substituir senhas caso elas já existam:
+
+| Perfil | E-mail | Senha demonstrativa |
+| --- | --- | --- |
+| Aluno | `ana@student.profrate.test` | `ProfRate#2026Aluno` |
+| Moderador | `moderador@profrate.test` | `ProfRate#2026Moderador` |
+
+Essas credenciais são dados de demonstração, não devem ser reutilizadas fora deste ambiente e não representam pessoas reais. O banco armazena apenas hashes bcrypt das senhas.
+
 ```sh
 pnpm --filter @profrate/api db:generate
 ```
@@ -129,18 +140,25 @@ pnpm --filter @profrate/api db:generate
 | Método | Caminho | Resposta |
 | --- | --- | --- |
 | GET | `/health` | `{ "status": "ok" }` |
+| POST | `/auth/signup` | Cria uma conta `student` e retorna usuário público e token |
+| POST | `/auth/login` | Autentica por e-mail e senha e retorna usuário público e token |
+| GET | `/me` | Retorna o usuário autenticado |
+| PATCH | `/me` | Atualiza nome e, para aluno, curso |
+| GET | `/me/reviews` | Lista as avaliações do aluno autenticado com professor resumido |
 | GET | `/professors` | Lista de professores fictícios com `id` e `name` |
 | GET | `/professors/:id` | Professor com `id`, `name` e `department` |
 | GET | `/professors/:id/reviews` | Lista de avaliações com `id`, `professorId`, `rating` e `comment` |
-| POST | `/professors/:id/reviews` | Cria uma avaliação fictícia e responde `201` com o registro criado |
-| PATCH | `/professors/:professorId/reviews/:reviewId` | Atualiza parcialmente uma avaliação fictícia |
-| DELETE | `/professors/:professorId/reviews/:reviewId` | Exclui uma avaliação fictícia e responde `204` |
+| POST | `/professors/:id/reviews` | Aluno autenticado cria uma avaliação e recebe `201` |
+| PATCH | `/professors/:professorId/reviews/:reviewId` | Autor autenticado atualiza sua avaliação |
+| DELETE | `/professors/:professorId/reviews/:reviewId` | Autor autenticado exclui sua avaliação e recebe `204` |
 | GET | `/departments` | Lista os departamentos fictícios |
 | GET | `/courses` | Lista os cursos; aceita `departmentId` |
 | GET | `/disciplines` | Lista disciplinas; aceita `search`, `departmentId` e `courseId` |
 | GET | `/disciplines/:id` | Detalha a disciplina, seus cursos e professores relacionados |
 
-O corpo de `POST /professors/:id/reviews` deve conter `rating` inteiro de 1 a 5 e `comment` não vazio. A API responde `400` para ID ou corpo inválido, `404` quando o professor não existe e `400` com erro específico para JSON malformado.
+As rotas públicas de catálogo continuam sem exigir sessão. Escritas de avaliações usam `Authorization: Bearer <token>`, aceitam `rating` inteiro de 1 a 5 e `comment` não vazio, e derivam o autor exclusivamente do token. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
+
+Senhas são validadas na borda, armazenadas com bcrypt (custo 12) e nunca registradas ou devolvidas. O JWT é criado e verificado pelo `jose`; a API valida assinatura, expiração, formato do payload, existência, estado e papel atual do usuário antes de autorizar uma operação.
 
 ## Verificações
 

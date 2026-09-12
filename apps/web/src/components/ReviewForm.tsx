@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { useAuth } from "../auth/AuthContext.js";
 import type { Review } from "../types/professor.js";
 import {
   countReviewCommentCharacters,
@@ -15,6 +16,7 @@ export function ReviewForm({
   professorId: number;
   onReviewCreated: (review: Review) => void;
 }) {
+  const { apiFetch } = useAuth();
   const [rating, setRating] = useState("");
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,7 +60,7 @@ export function ReviewForm({
     setFeedback(null);
 
     try {
-      const response = await fetch(`/api/professors/${professorId}/reviews`, {
+      const response = await apiFetch(`/api/professors/${professorId}/reviews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating: numericRating, comment }),

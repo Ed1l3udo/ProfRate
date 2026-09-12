@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 
+import { useAuth } from "../auth/AuthContext.js";
 import type { ProfessorListItem } from "../types/professor.js";
 import {
   createProfessorSearchParams,
@@ -15,6 +16,7 @@ const averageRatingFormatter = new Intl.NumberFormat("pt-BR", {
 });
 
 export function ProfessorsListPage() {
+  const { apiFetch } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const appliedFilters = readProfessorFilters(searchParams);
   const appliedSearch = appliedFilters.search;
@@ -42,7 +44,7 @@ export function ProfessorsListPage() {
         const url = canonicalSearchParams === ""
           ? "/api/professors"
           : `/api/professors?${canonicalSearchParams}`;
-        const response = await fetch(url, { signal: controller.signal });
+        const response = await apiFetch(url, { signal: controller.signal });
 
         if (controller.signal.aborted) {
           return;
@@ -72,7 +74,7 @@ export function ProfessorsListPage() {
     return () => {
       controller.abort();
     };
-  }, [canonicalSearchParams]);
+  }, [apiFetch, canonicalSearchParams]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

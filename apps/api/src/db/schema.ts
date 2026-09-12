@@ -1,14 +1,18 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
   pgTable,
+  pgEnum,
   primaryKey,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
+export const userRole = pgEnum("user_role", ["student", "moderator"]);
 
 export const departments = pgTable("departments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -94,6 +98,34 @@ export const courseDisciplines = pgTable(
   ],
 );
 
+export const users = pgTable(
+  "users",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    passwordHash: text("password_hash").notNull(),
+    role: userRole("role").notNull(),
+    courseId: integer("course_id").references(() => courses.id),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check("users_name_not_blank", sql`length(trim(${table.name})) > 0`),
+    check("users_email_lowercase", sql`${table.email} = lower(${table.email})`),
+    check(
+      "users_student_requires_course",
+      sql`${table.role} <> 'student' OR ${table.courseId} IS NOT NULL`,
+    ),
+    index("users_course_id_idx").on(table.courseId),
+  ],
+);
+
 export const reviews = pgTable(
   "reviews",
   {
@@ -101,6 +133,9 @@ export const reviews = pgTable(
     professorId: integer("professor_id")
       .notNull()
       .references(() => professors.id, { onDelete: "cascade" }),
+    authorId: integer("author_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     rating: integer("rating").notNull(),
     comment: text("comment").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
@@ -114,5 +149,6 @@ export const reviews = pgTable(
     check("reviews_rating_between_1_and_5", sql`${table.rating} BETWEEN 1 AND 5`),
     check("reviews_comment_not_blank", sql`length(trim(${table.comment})) > 0`),
     check("reviews_comment_max_500", sql`char_length(${table.comment}) <= 500`),
+    index("reviews_author_id_idx").on(table.authorId),
   ],
 );

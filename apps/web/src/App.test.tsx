@@ -7,6 +7,29 @@ import { ProfessorReviews } from "./components/ProfessorReviews.js";
 import { ProfessorDetailsPage } from "./pages/ProfessorDetailsPage.js";
 import type { Review } from "./types/professor.js";
 
+const mockApiFetch = vi.hoisted(() => (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) => fetch(input, init));
+
+vi.mock("./auth/AuthContext.js", () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  useAuth: () => ({
+    status: "authenticated",
+    user: {
+      id: 1,
+      name: "Aluno Teste",
+      email: "aluno@teste.local",
+      role: "student",
+      course: { id: 1, name: "Computação Aplicada" },
+    },
+    apiFetch: mockApiFetch,
+    saveSession: vi.fn(),
+    updateUser: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
 function renderApp(initialEntry: string) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -89,6 +112,7 @@ const adaReviews = [
     comment: "Explicações claras e atividades bem organizadas.",
     createdAt: "2025-01-10T12:00:00.000Z",
     updatedAt: "2025-01-10T12:00:00.000Z",
+    canManage: true,
   },
   {
     id: 2,
@@ -97,6 +121,7 @@ const adaReviews = [
     comment: "Feedbacks úteis durante os exercícios.",
     createdAt: "2025-01-10T12:00:00.000Z",
     updatedAt: "2025-01-10T12:00:00.000Z",
+    canManage: true,
   },
 ];
 
@@ -108,6 +133,7 @@ const orderedReviews: Review[] = [
     comment: "Nota três mais antiga.",
     createdAt: "2025-01-01T12:00:00.000Z",
     updatedAt: "2025-01-01T12:00:00.000Z",
+    canManage: true,
   },
   {
     id: 2,
@@ -116,6 +142,7 @@ const orderedReviews: Review[] = [
     comment: "Nota cinco recente de id menor.",
     createdAt: "2025-01-03T12:00:00.000Z",
     updatedAt: "2025-01-03T12:00:00.000Z",
+    canManage: true,
   },
   {
     id: 3,
@@ -124,6 +151,7 @@ const orderedReviews: Review[] = [
     comment: "Nota cinco recente de id maior.",
     createdAt: "2025-01-03T12:00:00.000Z",
     updatedAt: "2025-01-03T12:00:00.000Z",
+    canManage: true,
   },
   {
     id: 4,
@@ -132,6 +160,7 @@ const orderedReviews: Review[] = [
     comment: "Nota um de id menor.",
     createdAt: "2025-01-02T12:00:00.000Z",
     updatedAt: "2025-01-02T12:00:00.000Z",
+    canManage: true,
   },
   {
     id: 5,
@@ -140,6 +169,7 @@ const orderedReviews: Review[] = [
     comment: "Nota um de id maior.",
     createdAt: "2025-01-02T12:00:00.000Z",
     updatedAt: "2025-01-02T12:00:00.000Z",
+    canManage: true,
   },
   {
     id: 6,
@@ -148,6 +178,7 @@ const orderedReviews: Review[] = [
     comment: "Nota cinco antiga.",
     createdAt: "2024-12-31T12:00:00.000Z",
     updatedAt: "2024-12-31T12:00:00.000Z",
+    canManage: true,
   },
   {
     id: 7,
@@ -156,6 +187,7 @@ const orderedReviews: Review[] = [
     comment: "Nota dois.",
     createdAt: "2025-01-02T10:00:00.000Z",
     updatedAt: "2025-01-02T10:00:00.000Z",
+    canManage: true,
   },
   {
     id: 8,
@@ -164,6 +196,7 @@ const orderedReviews: Review[] = [
     comment: "Nota quatro.",
     createdAt: "2025-01-02T11:00:00.000Z",
     updatedAt: "2025-01-02T11:00:00.000Z",
+    canManage: true,
   },
 ];
 
@@ -850,6 +883,7 @@ describe("professor details", () => {
       comment: "Comentário normalizado.",
       createdAt: "2025-01-10T12:00:00.000Z",
       updatedAt: "2025-01-10T12:00:00.000Z",
+      canManage: true,
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {
@@ -916,6 +950,7 @@ describe("professor details", () => {
       comment: "Primeira avaliação.",
       createdAt: "2025-01-10T12:00:00.000Z",
       updatedAt: "2025-01-10T12:00:00.000Z",
+      canManage: true,
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {
@@ -1377,6 +1412,7 @@ describe("review filtering and ordering", () => {
       comment: "Avaliação recém-criada.",
       createdAt: "2025-01-11T12:00:00.000Z",
       updatedAt: "2025-01-11T12:00:00.000Z",
+      canManage: true,
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {
@@ -1424,6 +1460,7 @@ describe("review filtering and ordering", () => {
       rating: 3,
       comment: "Avaliação com nota editada.",
       updatedAt: "2025-01-11T14:30:00.000Z",
+      canManage: true,
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {
@@ -1526,7 +1563,11 @@ describe("review filtering and ordering", () => {
         : [secondProfessorReview],
     }));
     vi.stubGlobal("fetch", fetchMock);
-    const view = render(<ProfessorReviews professorId={1} />);
+    const view = render(
+      <MemoryRouter>
+        <ProfessorReviews professorId={1} />
+      </MemoryRouter>,
+    );
     await screen.findByText("Feedbacks úteis durante os exercícios.");
 
     fireEvent.change(screen.getByLabelText("Filtrar por nota"), {
@@ -1535,7 +1576,11 @@ describe("review filtering and ordering", () => {
     fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
       target: { value: "oldest" },
     });
-    view.rerender(<ProfessorReviews professorId={2} />);
+    view.rerender(
+      <MemoryRouter>
+        <ProfessorReviews professorId={2} />
+      </MemoryRouter>,
+    );
 
     expect(await screen.findByText("Avaliação do segundo professor.")).toBeInTheDocument();
     expect(screen.getByLabelText("Filtrar por nota")).toHaveValue("all");
@@ -1934,6 +1979,7 @@ describe("review editing", () => {
       comment: "Comentário atualizado.",
       createdAt: "2025-01-10T12:00:00.000Z",
       updatedAt: "2025-01-11T14:30:00.000Z",
+      canManage: true,
     };
     const fetchMock = vi.fn((url: string, options?: RequestInit) => {
       if (url === "/api/professors/1") {

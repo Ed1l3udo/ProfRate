@@ -14,12 +14,16 @@ import {
   professorDisciplines,
   professors,
   reviews,
+  users,
 } from "../../src/db/schema.js";
+import { createPasswordService } from "../../src/modules/auth/password.js";
+import { createTokenService } from "../../src/modules/auth/token.js";
 import { createCoursesRepository } from "../../src/modules/courses/repository.js";
 import { createDepartmentsRepository } from "../../src/modules/departments/repository.js";
 import { createDisciplinesRepository } from "../../src/modules/disciplines/repository.js";
 import { createProfessorsRepository } from "../../src/modules/professors/repository.js";
 import { createReviewsRepository } from "../../src/modules/reviews/repository.js";
+import { createUsersRepository } from "../../src/modules/users/repository.js";
 
 const integrationDatabaseName = "profrate_test";
 export const reviewFixtureTimestamp = new Date("2025-01-10T12:00:00.000Z");
@@ -144,9 +148,13 @@ type IntegrationContext = {
   departmentsRepository: ReturnType<typeof createDepartmentsRepository>;
   coursesRepository: ReturnType<typeof createCoursesRepository>;
   disciplinesRepository: ReturnType<typeof createDisciplinesRepository>;
+  usersRepository: ReturnType<typeof createUsersRepository>;
+  passwordService: ReturnType<typeof createPasswordService>;
+  tokenService: ReturnType<typeof createTokenService>;
 };
 
 let context: IntegrationContext | undefined;
+let fixturePasswordHash = "";
 
 export async function initializeIntegrationDatabase(): Promise<void> {
   if (context !== undefined) {
@@ -160,6 +168,9 @@ export async function initializeIntegrationDatabase(): Promise<void> {
     await assertConnectedToIntegrationDatabase(database.pool);
     await migrate(database.db, { migrationsFolder });
 
+    const passwordService = createPasswordService();
+    fixturePasswordHash = await passwordService.hashPassword("Senha123");
+
     context = {
       database,
       professorsRepository: createProfessorsRepository(database.db),
@@ -167,6 +178,9 @@ export async function initializeIntegrationDatabase(): Promise<void> {
       departmentsRepository: createDepartmentsRepository(database.db),
       coursesRepository: createCoursesRepository(database.db),
       disciplinesRepository: createDisciplinesRepository(database.db),
+      usersRepository: createUsersRepository(database.db),
+      passwordService,
+      tokenService: createTokenService("integration-test-jwt-secret-with-at-least-32-characters"),
     };
   } catch (error) {
     await database.close();
@@ -187,7 +201,7 @@ async function truncateIntegrationTables(): Promise<void> {
 
   await assertConnectedToIntegrationDatabase(database.pool);
   await database.db.execute(
-    sql`TRUNCATE TABLE reviews, professor_disciplines, course_disciplines, disciplines, courses, professors, departments RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE TABLE reviews, users, professor_disciplines, course_disciplines, disciplines, courses, professors, departments RESTART IDENTITY CASCADE`,
   );
 }
 
@@ -237,9 +251,34 @@ export async function resetIntegrationDatabase(): Promise<void> {
     { professorId: insertedProfessors[1].id, disciplineId: insertedDisciplines[2].id },
   ]);
 
+  await database.db.insert(users).values([
+    {
+      name: "Aluno Um",
+      email: "aluno.um@profrate.test",
+      passwordHash: fixturePasswordHash,
+      role: "student",
+      courseId: insertedCourses[0].id,
+    },
+    {
+      name: "Aluno Dois",
+      email: "aluno.dois@profrate.test",
+      passwordHash: fixturePasswordHash,
+      role: "student",
+      courseId: insertedCourses[1].id,
+    },
+    {
+      name: "Moderador Teste",
+      email: "moderador.teste@profrate.test",
+      passwordHash: fixturePasswordHash,
+      role: "moderator",
+      courseId: null,
+    },
+  ]);
+
   await database.db.insert(reviews).values([
     {
       professorId: insertedProfessors[0].id,
+      authorId: 1,
       rating: 5,
       comment: "Primeira avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
@@ -247,6 +286,7 @@ export async function resetIntegrationDatabase(): Promise<void> {
     },
     {
       professorId: insertedProfessors[0].id,
+      authorId: 1,
       rating: 4,
       comment: "Segunda avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
@@ -254,6 +294,7 @@ export async function resetIntegrationDatabase(): Promise<void> {
     },
     {
       professorId: insertedProfessors[1].id,
+      authorId: 2,
       rating: 3,
       comment: "Terceira avaliação de teste.",
       createdAt: reviewFixtureTimestamp,

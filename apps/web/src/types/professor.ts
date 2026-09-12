@@ -19,4 +19,9 @@ export type Review = {
   comment: string;
   createdAt: string;
   updatedAt: string;
+  canManage: boolean;
+};
+
+export type MyReview = Review & {
+  professor: { id: number; name: string };
 };
