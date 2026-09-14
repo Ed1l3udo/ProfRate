@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/database.js";
 import {
@@ -8,6 +8,7 @@ import {
   disciplines,
   professorDisciplines,
   professors,
+  reviews,
 } from "../../db/schema.js";
 import type { DisciplineFilters } from "./schemas.js";
 
@@ -16,6 +17,8 @@ type DisciplineBase = {
   code: string;
   name: string;
   workloadHours: number;
+  reviewCount: number;
+  averageRating: number | null;
   department: { id: number; name: string };
 };
 
@@ -45,9 +48,12 @@ export function createDisciplinesRepository(db: Database) {
         workloadHours: disciplines.workloadHours,
         departmentId: departments.id,
         departmentName: departments.name,
+        reviewCount: count(reviews.id),
+        averageRating: sql<number | null>`avg(${reviews.rating})::double precision`,
       })
       .from(disciplines)
       .innerJoin(departments, eq(departments.id, disciplines.departmentId))
+      .leftJoin(reviews, eq(reviews.disciplineId, disciplines.id))
       .where(
         and(
           filters.search === undefined
@@ -67,6 +73,14 @@ export function createDisciplinesRepository(db: Database) {
                   and ${courseDisciplines.courseId} = ${filters.courseId}
               )`,
         ),
+      )
+      .groupBy(
+        disciplines.id,
+        disciplines.code,
+        disciplines.name,
+        disciplines.workloadHours,
+        departments.id,
+        departments.name,
       )
       .orderBy(asc(disciplines.id));
 
@@ -102,6 +116,14 @@ export function createDisciplinesRepository(db: Database) {
         workloadHours: disciplines.workloadHours,
         departmentId: departments.id,
         departmentName: departments.name,
+        reviewCount: sql<number>`(
+          select count(*)::integer from ${reviews}
+          where ${reviews.disciplineId} = ${disciplines.id}
+        )`,
+        averageRating: sql<number | null>`(
+          select avg(${reviews.rating})::double precision from ${reviews}
+          where ${reviews.disciplineId} = ${disciplines.id}
+        )`,
       })
       .from(disciplines)
       .innerJoin(departments, eq(departments.id, disciplines.departmentId))
@@ -132,6 +154,8 @@ export function createDisciplinesRepository(db: Database) {
       code: row.code,
       name: row.name,
       workloadHours: row.workloadHours,
+      reviewCount: row.reviewCount,
+      averageRating: row.averageRating,
       department: { id: row.departmentId, name: row.departmentName },
     };
 

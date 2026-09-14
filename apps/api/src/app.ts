@@ -51,11 +51,13 @@ import {
   invalidJsonBodyError,
   invalidReviewInputError,
   invalidReviewUpdateError,
-  createReviewBodySchema,
+  createDisciplineReviewBodySchema,
+  createProfessorReviewBodySchema,
   reviewIdParamsSchema,
   reviewNotFoundError,
   reviewNotOwnedError,
-  updateReviewBodySchema,
+  updateDisciplineReviewBodySchema,
+  updateProfessorReviewBodySchema,
 } from "./modules/reviews/schemas.js";
 import type { ReviewsRepository } from "./modules/reviews/repository.js";
 import {
@@ -85,6 +87,13 @@ export function createApp({
   listReviewsByProfessorId,
   deleteReview,
   updateReview,
+  createDisciplineReview = async () => {
+    throw new Error("Discipline review repository is not configured.");
+  },
+  deleteDisciplineReview = async () => undefined,
+  findDisciplineReviewOwnership = async () => undefined,
+  listReviewsByDisciplineId = async () => [],
+  updateDisciplineReview = async () => undefined,
   findDisciplineById = async () => undefined,
   listCourses = async () => [],
   listDepartments = async () => [],
@@ -103,12 +112,26 @@ export function createApp({
     throw new Error("Token service is not configured.");
   },
 }: {
-  createReview: ReviewsRepository["createReview"];
+  createReview: (
+    input: Parameters<ReviewsRepository["createReview"]>[0],
+  ) => Promise<unknown>;
   findProfessorById: ProfessorsRepository["findProfessorById"];
   listProfessors: ProfessorsRepository["listProfessors"];
-  listReviewsByProfessorId: ReviewsRepository["listReviewsByProfessorId"];
-  deleteReview: ReviewsRepository["deleteReview"];
-  updateReview: ReviewsRepository["updateReview"];
+  listReviewsByProfessorId: (
+    professorId: number,
+    viewerUserId?: number,
+  ) => Promise<unknown[]>;
+  deleteReview: (
+    input: Parameters<ReviewsRepository["deleteReview"]>[0],
+  ) => Promise<unknown | undefined>;
+  updateReview: (
+    input: Parameters<ReviewsRepository["updateReview"]>[0],
+  ) => Promise<unknown | undefined>;
+  createDisciplineReview?: ReviewsRepository["createDisciplineReview"];
+  deleteDisciplineReview?: ReviewsRepository["deleteDisciplineReview"];
+  findDisciplineReviewOwnership?: ReviewsRepository["findDisciplineReviewOwnership"];
+  listReviewsByDisciplineId?: ReviewsRepository["listReviewsByDisciplineId"];
+  updateDisciplineReview?: ReviewsRepository["updateDisciplineReview"];
   findDisciplineById?: DisciplinesRepository["findDisciplineById"];
   listCourses?: CoursesRepository["listCourses"];
   listDepartments?: DepartmentsRepository["listDepartments"];
@@ -275,6 +298,150 @@ export function createApp({
     return response.status(200).json(discipline);
   });
 
+  app.get(
+    "/disciplines/:id/reviews",
+    optionalAuthentication,
+    async (request, response) => {
+      const parsedParams = disciplineIdParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        return response.status(400).json({ error: invalidDisciplineIdError });
+      }
+
+      const discipline = await findDisciplineById(parsedParams.data.id);
+      if (discipline === undefined) {
+        return response.status(404).json({ error: disciplineNotFoundError });
+      }
+
+      const viewer = response.locals.authUser as ReturnType<typeof authenticatedUser> | undefined;
+      const reviews = viewer?.role === "student"
+        ? await listReviewsByDisciplineId(parsedParams.data.id, viewer.id)
+        : await listReviewsByDisciplineId(parsedParams.data.id);
+      return response.status(200).json(reviews);
+    },
+  );
+
+  app.post(
+    "/disciplines/:id/reviews",
+    requireAuthentication,
+    requireStudent,
+    async (request, response) => {
+      const parsedParams = disciplineIdParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        return response.status(400).json({ error: invalidDisciplineIdError });
+      }
+
+      const parsedBody = createDisciplineReviewBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return response.status(400).json({ error: invalidReviewInputError });
+      }
+
+      const discipline = await findDisciplineById(parsedParams.data.id);
+      if (discipline === undefined) {
+        return response.status(404).json({ error: disciplineNotFoundError });
+      }
+
+      const review = await createDisciplineReview({
+        disciplineId: parsedParams.data.id,
+        authorId: authenticatedUser(response).id,
+        ratings: parsedBody.data.ratings,
+        comment: parsedBody.data.comment,
+      });
+      return response.status(201).json(review);
+    },
+  );
+
+  app.patch(
+    "/disciplines/:disciplineId/reviews/:reviewId",
+    requireAuthentication,
+    requireStudent,
+    async (request, response) => {
+      const parsedDisciplineId = disciplineIdParamsSchema.safeParse({ id: request.params.disciplineId });
+      const parsedReviewId = reviewIdParamsSchema.safeParse({ reviewId: request.params.reviewId });
+      if (!parsedDisciplineId.success) {
+        return response.status(400).json({ error: invalidDisciplineIdError });
+      }
+      if (!parsedReviewId.success) {
+        return response.status(400).json({ error: invalidReviewIdError });
+      }
+
+      const parsedBody = updateDisciplineReviewBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return response.status(400).json({ error: invalidReviewUpdateError });
+      }
+
+      const discipline = await findDisciplineById(parsedDisciplineId.data.id);
+      if (discipline === undefined) {
+        return response.status(404).json({ error: disciplineNotFoundError });
+      }
+
+      const ownership = await findDisciplineReviewOwnership({
+        disciplineId: parsedDisciplineId.data.id,
+        reviewId: parsedReviewId.data.reviewId,
+      });
+      if (ownership === undefined) {
+        return response.status(404).json({ error: reviewNotFoundError });
+      }
+
+      const user = authenticatedUser(response);
+      if (ownership.authorId !== user.id) {
+        return response.status(403).json({ error: reviewNotOwnedError });
+      }
+
+      const review = await updateDisciplineReview({
+        disciplineId: parsedDisciplineId.data.id,
+        reviewId: parsedReviewId.data.reviewId,
+        authorId: user.id,
+        ...parsedBody.data,
+      });
+      return review === undefined
+        ? response.status(404).json({ error: reviewNotFoundError })
+        : response.status(200).json(review);
+    },
+  );
+
+  app.delete(
+    "/disciplines/:disciplineId/reviews/:reviewId",
+    requireAuthentication,
+    requireStudent,
+    async (request, response) => {
+      const parsedDisciplineId = disciplineIdParamsSchema.safeParse({ id: request.params.disciplineId });
+      const parsedReviewId = reviewIdParamsSchema.safeParse({ reviewId: request.params.reviewId });
+      if (!parsedDisciplineId.success) {
+        return response.status(400).json({ error: invalidDisciplineIdError });
+      }
+      if (!parsedReviewId.success) {
+        return response.status(400).json({ error: invalidReviewIdError });
+      }
+
+      const discipline = await findDisciplineById(parsedDisciplineId.data.id);
+      if (discipline === undefined) {
+        return response.status(404).json({ error: disciplineNotFoundError });
+      }
+
+      const ownership = await findDisciplineReviewOwnership({
+        disciplineId: parsedDisciplineId.data.id,
+        reviewId: parsedReviewId.data.reviewId,
+      });
+      if (ownership === undefined) {
+        return response.status(404).json({ error: reviewNotFoundError });
+      }
+
+      const user = authenticatedUser(response);
+      if (ownership.authorId !== user.id) {
+        return response.status(403).json({ error: reviewNotOwnedError });
+      }
+
+      const review = await deleteDisciplineReview({
+        disciplineId: parsedDisciplineId.data.id,
+        reviewId: parsedReviewId.data.reviewId,
+        authorId: user.id,
+      });
+      return review === undefined
+        ? response.status(404).json({ error: reviewNotFoundError })
+        : response.status(204).send();
+    },
+  );
+
   app.get("/professors", async (request, response) => {
     const parsedFilters = professorFiltersSchema.safeParse(request.query);
 
@@ -353,7 +520,7 @@ export function createApp({
       });
     }
 
-    const parsedBody = createReviewBodySchema.safeParse(request.body);
+    const parsedBody = createProfessorReviewBodySchema.safeParse(request.body);
 
     if (!parsedBody.success) {
       return response.status(400).json({
@@ -371,7 +538,7 @@ export function createApp({
 
     const review = await createReview({
       professorId: parsedParams.data.id,
-      rating: parsedBody.data.rating,
+      ratings: parsedBody.data.ratings,
       comment: parsedBody.data.comment,
       authorId: authenticatedUser(response).id,
     });
@@ -464,7 +631,7 @@ export function createApp({
         return response.status(400).json({ error: invalidReviewIdError });
       }
 
-      const parsedBody = updateReviewBodySchema.safeParse(request.body);
+      const parsedBody = updateProfessorReviewBodySchema.safeParse(request.body);
 
       if (!parsedBody.success) {
         return response.status(400).json({ error: invalidReviewUpdateError });

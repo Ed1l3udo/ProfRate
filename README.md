@@ -118,7 +118,7 @@ Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker comp
 ## Banco de dados
 
 - `db:migrate` aplica as migrations SQL geradas pelo Drizzle.
-- `db:seed` insere o catálogo fictício com 3 departamentos, 3 cursos, 10 professores, 15 disciplinas e as três avaliações conhecidas, sem duplicar os dados controlados quando executado novamente.
+- `db:seed` insere o catálogo fictício com 3 departamentos, 3 cursos, 10 professores, 15 disciplinas, três avaliações de professor e três avaliações de disciplina, sem duplicar os dados controlados quando executado novamente.
 - `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
 - `db:generate` gera uma nova migration depois de uma alteração aprovada no schema Drizzle.
 
@@ -144,10 +144,10 @@ pnpm --filter @profrate/api db:generate
 | POST | `/auth/login` | Autentica por e-mail e senha e retorna usuário público e token |
 | GET | `/me` | Retorna o usuário autenticado |
 | PATCH | `/me` | Atualiza nome e, para aluno, curso |
-| GET | `/me/reviews` | Lista as avaliações do aluno autenticado com professor resumido |
+| GET | `/me/reviews` | Lista as avaliações do aluno autenticado com o alvo resumido |
 | GET | `/professors` | Lista de professores fictícios com `id` e `name` |
 | GET | `/professors/:id` | Professor com `id`, `name` e `department` |
-| GET | `/professors/:id/reviews` | Lista de avaliações com `id`, `professorId`, `rating` e `comment` |
+| GET | `/professors/:id/reviews` | Lista as avaliações estruturadas do professor |
 | POST | `/professors/:id/reviews` | Aluno autenticado cria uma avaliação e recebe `201` |
 | PATCH | `/professors/:professorId/reviews/:reviewId` | Autor autenticado atualiza sua avaliação |
 | DELETE | `/professors/:professorId/reviews/:reviewId` | Autor autenticado exclui sua avaliação e recebe `204` |
@@ -155,8 +155,12 @@ pnpm --filter @profrate/api db:generate
 | GET | `/courses` | Lista os cursos; aceita `departmentId` |
 | GET | `/disciplines` | Lista disciplinas; aceita `search`, `departmentId` e `courseId` |
 | GET | `/disciplines/:id` | Detalha a disciplina, seus cursos e professores relacionados |
+| GET | `/disciplines/:id/reviews` | Lista as avaliações estruturadas da disciplina |
+| POST | `/disciplines/:id/reviews` | Aluno autenticado cria uma avaliação e recebe `201` |
+| PATCH | `/disciplines/:disciplineId/reviews/:reviewId` | Autor autenticado atualiza sua avaliação |
+| DELETE | `/disciplines/:disciplineId/reviews/:reviewId` | Autor autenticado exclui sua avaliação e recebe `204` |
 
-As rotas públicas de catálogo continuam sem exigir sessão. Escritas de avaliações usam `Authorization: Bearer <token>`, aceitam `rating` inteiro de 1 a 5 e `comment` não vazio, e derivam o autor exclusivamente do token. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
+As rotas públicas de catálogo continuam sem exigir sessão. Escritas de avaliações usam `Authorization: Bearer <token>`, aceitam um objeto `ratings` completo — quatro critérios para professor ou três para disciplina — e `comment` não vazio. A média decimal `rating` é derivada pelo PostgreSQL e não é aceita no corpo da requisição; o autor vem exclusivamente do token. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
 
 Senhas são validadas na borda, armazenadas com bcrypt (custo 12) e nunca registradas ou devolvidas. O JWT é criado e verificado pelo `jose`; a API valida assinatura, expiração, formato do payload, existência, estado e papel atual do usuário antes de autorizar uma operação.
 

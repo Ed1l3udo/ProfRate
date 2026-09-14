@@ -4,6 +4,12 @@ import { MemoryRouter, useLocation } from "react-router";
 
 import { App } from "./App.js";
 
+const professorReviewFields = (rating: number) => ({
+  disciplineId: null,
+  targetType: "professor" as const,
+  ratings: { didactics: rating, clarity: rating, punctuality: rating, availability: rating },
+});
+
 const student = {
   id: 7,
   name: "Ana Exemplo",
@@ -120,6 +126,7 @@ describe("authentication flows", () => {
         id: 1,
         professorId: 1,
         rating: 5,
+        ...professorReviewFields(5),
         comment: "Minha avaliação.",
         createdAt: "2026-01-01T12:00:00.000Z",
         updatedAt: "2026-01-01T12:00:00.000Z",
@@ -129,6 +136,7 @@ describe("authentication flows", () => {
         id: 2,
         professorId: 1,
         rating: 4,
+        ...professorReviewFields(4),
         comment: "Avaliação de outra pessoa.",
         createdAt: "2026-01-02T12:00:00.000Z",
         updatedAt: "2026-01-02T12:00:00.000Z",
@@ -147,6 +155,7 @@ describe("authentication flows", () => {
           id: 3,
           professorId: 1,
           rating: 5,
+          ...professorReviewFields(5),
           comment: "Nova avaliação autenticada.",
           createdAt: "2026-01-03T12:00:00.000Z",
           updatedAt: "2026-01-03T12:00:00.000Z",
@@ -168,9 +177,9 @@ describe("authentication flows", () => {
     expect(within(otherCard!).queryByRole("button", { name: "Editar avaliação" })).not.toBeInTheDocument();
     expect(screen.getByText("Ana Exemplo")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Nota", { selector: "input" }), {
-      target: { value: "5" },
-    });
+    for (const label of ["Didática", "Clareza", "Pontualidade", "Disponibilidade"]) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value: "5" } });
+    }
     fireEvent.change(screen.getByLabelText("Comentário", { selector: "textarea" }), {
       target: { value: "Nova avaliação autenticada." },
     });
@@ -189,6 +198,7 @@ describe("authentication flows", () => {
           id: 1,
           professorId: 1,
           rating: 5,
+          ...professorReviewFields(5),
           comment: "Avaliação antiga e pública.",
           createdAt: "2025-01-01T12:00:00.000Z",
           updatedAt: "2025-01-01T12:00:00.000Z",

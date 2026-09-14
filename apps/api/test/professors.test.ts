@@ -44,12 +44,22 @@ function createApp(
 const testReview = {
   id: 0,
   professorId: 0,
+  disciplineId: null,
+  targetType: "professor" as const,
   rating: 1,
+  ratings: { didactics: 1, clarity: 1, punctuality: 1, availability: 1 },
   comment: "",
   createdAt: new Date("2025-01-10T12:00:00.000Z"),
   updatedAt: new Date("2025-01-10T12:00:00.000Z"),
   canManage: true,
 };
+
+const professorRatings = (rating: number) => ({
+  didactics: rating,
+  clarity: rating,
+  punctuality: rating,
+  availability: rating,
+});
 
 describe("GET /professors", () => {
   it("returns the professors provided by the repository", async () => {
@@ -377,12 +387,12 @@ describe("GET /professors/:id/reviews", () => {
 describe("POST /professors/:id/reviews", () => {
   it("creates a review with a converted id and trimmed comment", async () => {
     const createdReview = {
+      ...testReview,
       id: 4,
       professorId: 1,
       rating: 5,
+      ratings: professorRatings(5),
       comment: "Explicações muito claras.",
-      createdAt: testReview.createdAt,
-      updatedAt: testReview.updatedAt,
     };
     const findProfessorById = vi.fn().mockResolvedValue({
       id: 1,
@@ -399,7 +409,7 @@ describe("POST /professors/:id/reviews", () => {
     });
 
     const response = await request(app).post("/professors/1/reviews").send({
-      rating: 5,
+      ratings: professorRatings(5),
       comment: "  Explicações muito claras.  ",
     });
 
@@ -415,7 +425,7 @@ describe("POST /professors/:id/reviews", () => {
     expect(createReview).toHaveBeenCalledWith({
       professorId: 1,
       authorId: 1,
-      rating: 5,
+      ratings: professorRatings(5),
       comment: "Explicações muito claras.",
     });
   });
@@ -445,14 +455,14 @@ describe("POST /professors/:id/reviews", () => {
 
     const response = await request(app)
       .post("/professors/1/reviews")
-      .send({ rating: 5, comment });
+      .send({ ratings: professorRatings(5), comment });
 
     expect(response.status).toBe(201);
     expect(Array.from(normalizedComment)).toHaveLength(500);
     expect(createReview).toHaveBeenCalledWith({
       professorId: 1,
       authorId: 1,
-      rating: 5,
+      ratings: professorRatings(5),
       comment: normalizedComment,
     });
   });
@@ -473,14 +483,14 @@ describe("POST /professors/:id/reviews", () => {
 
     const response = await request(app)
       .post("/professors/1/reviews")
-      .send({ rating: 5, comment });
+      .send({ ratings: professorRatings(5), comment });
 
     expect(response.status).toBe(400);
     expect(response.body).toStrictEqual({
       error: {
         code: "INVALID_REVIEW_INPUT",
         message:
-          "Review body must include an integer rating from 1 to 5 and a non-empty comment of at most 500 characters.",
+          "Review body must contain the complete ratings object and a non-empty comment of at most 500 characters.",
       },
     });
     expect(findProfessorById).not.toHaveBeenCalled();
@@ -499,7 +509,7 @@ describe("POST /professors/:id/reviews", () => {
     });
 
     const response = await request(app).post("/professors/999999/reviews").send({
-      rating: 5,
+      ratings: professorRatings(5),
       comment: "Explicações muito claras.",
     });
 
@@ -528,7 +538,7 @@ describe("POST /professors/:id/reviews", () => {
       });
 
       const response = await request(app).post(`/professors/${id}/reviews`).send({
-        rating: 5,
+        ratings: professorRatings(5),
         comment: "Explicações muito claras.",
       });
 
@@ -545,18 +555,22 @@ describe("POST /professors/:id/reviews", () => {
   );
 
   it.each([
-    ["rating 0", { rating: 0, comment: "Comentário válido." }],
-    ["rating 6", { rating: 6, comment: "Comentário válido." }],
-    ["decimal rating", { rating: 1.5, comment: "Comentário válido." }],
-    ["string rating", { rating: "5", comment: "Comentário válido." }],
-    ["missing rating", { comment: "Comentário válido." }],
-    ["empty comment", { rating: 5, comment: "" }],
-    ["blank comment", { rating: 5, comment: "   " }],
-    ["non-text comment", { rating: 5, comment: 123 }],
-    ["missing comment", { rating: 5 }],
-    ["extra property", { rating: 5, comment: "Comentário válido.", extra: true }],
-    ["createdAt property", { rating: 5, comment: "Comentário válido.", createdAt: "2025-01-10T12:00:00.000Z" }],
-    ["updatedAt property", { rating: 5, comment: "Comentário válido.", updatedAt: "2025-01-10T12:00:00.000Z" }],
+    ["client rating", { ratings: professorRatings(5), rating: 5, comment: "Comentário válido." }],
+    ["criterion 0", { ratings: { ...professorRatings(5), didactics: 0 }, comment: "Comentário válido." }],
+    ["criterion 6", { ratings: { ...professorRatings(5), clarity: 6 }, comment: "Comentário válido." }],
+    ["decimal criterion", { ratings: { ...professorRatings(5), punctuality: 1.5 }, comment: "Comentário válido." }],
+    ["string criterion", { ratings: { ...professorRatings(5), availability: "5" }, comment: "Comentário válido." }],
+    ["missing criterion", { ratings: { didactics: 5, clarity: 5, punctuality: 5 }, comment: "Comentário válido." }],
+    ["wrong criterion", { ratings: { ...professorRatings(5), workload: 5 }, comment: "Comentário válido." }],
+    ["missing ratings", { comment: "Comentário válido." }],
+    ["empty comment", { ratings: professorRatings(5), comment: "" }],
+    ["blank comment", { ratings: professorRatings(5), comment: "   " }],
+    ["non-text comment", { ratings: professorRatings(5), comment: 123 }],
+    ["missing comment", { ratings: professorRatings(5) }],
+    ["authorId property", { ratings: professorRatings(5), comment: "Comentário válido.", authorId: 1 }],
+    ["targetType property", { ratings: professorRatings(5), comment: "Comentário válido.", targetType: "professor" }],
+    ["createdAt property", { ratings: professorRatings(5), comment: "Comentário válido.", createdAt: "2025-01-10T12:00:00.000Z" }],
+    ["updatedAt property", { ratings: professorRatings(5), comment: "Comentário válido.", updatedAt: "2025-01-10T12:00:00.000Z" }],
   ])("returns 400 without querying repositories for %s", async (_name, body) => {
     const findProfessorById = vi.fn();
     const createReview = vi.fn();
@@ -575,7 +589,7 @@ describe("POST /professors/:id/reviews", () => {
       error: {
         code: "INVALID_REVIEW_INPUT",
         message:
-          "Review body must include an integer rating from 1 to 5 and a non-empty comment of at most 500 characters.",
+          "Review body must contain the complete ratings object and a non-empty comment of at most 500 characters.",
       },
     });
     expect(findProfessorById).not.toHaveBeenCalled();
@@ -750,18 +764,19 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
 
   it("updates both fields with numeric ids and a trimmed comment", async () => {
     const updatedReview = {
+      ...testReview,
       id: 1,
       professorId: 1,
       rating: 5,
+      ratings: professorRatings(5),
       comment: "Comentário atualizado.",
-      createdAt: testReview.createdAt,
       updatedAt: new Date("2025-01-11T14:30:00.000Z"),
     };
     const findProfessorById = vi.fn().mockResolvedValue(existingProfessor);
     const updateReview = vi.fn().mockResolvedValue(updatedReview);
     const response = await request(createUpdateApp(findProfessorById, updateReview))
       .patch("/professors/1/reviews/1")
-      .send({ rating: 5, comment: "  Comentário atualizado.  " });
+      .send({ ratings: professorRatings(5), comment: "  Comentário atualizado.  " });
 
     expect(response.status).toBe(200);
     expect(response.body).toStrictEqual({
@@ -774,12 +789,12 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       professorId: 1,
       authorId: 1,
       reviewId: 1,
-      rating: 5,
+      ratings: professorRatings(5),
       comment: "Comentário atualizado.",
     });
   });
 
-  it("updates only the rating", async () => {
+  it("updates only the complete ratings object", async () => {
     const updateReview = vi.fn().mockResolvedValue({
       id: 1,
       professorId: 1,
@@ -792,14 +807,14 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       createUpdateApp(vi.fn().mockResolvedValue(existingProfessor), updateReview),
     )
       .patch("/professors/1/reviews/1")
-      .send({ rating: 3 });
+      .send({ ratings: professorRatings(3) });
 
     expect(response.status).toBe(200);
     expect(updateReview).toHaveBeenCalledWith({
       professorId: 1,
       authorId: 1,
       reviewId: 1,
-      rating: 3,
+      ratings: professorRatings(3),
     });
   });
 
@@ -859,7 +874,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       error: {
         code: "INVALID_REVIEW_UPDATE",
         message:
-          "Review update must contain only valid fields and include an integer rating from 1 to 5 and/or a non-empty comment of at most 500 characters.",
+          "Review update must contain a complete valid ratings object and/or a non-empty comment of at most 500 characters.",
       },
     });
     expect(findProfessorById).not.toHaveBeenCalled();
@@ -868,16 +883,17 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
 
   it.each([
     ["empty body", {}],
-    ["rating 0", { rating: 0 }],
-    ["rating 6", { rating: 6 }],
-    ["decimal rating", { rating: 1.5 }],
-    ["string rating", { rating: "5" }],
+    ["client rating", { rating: 5 }],
+    ["criterion 0", { ratings: { ...professorRatings(5), didactics: 0 } }],
+    ["criterion 6", { ratings: { ...professorRatings(5), clarity: 6 } }],
+    ["partial ratings", { ratings: { didactics: 5 } }],
+    ["wrong criterion", { ratings: { ...professorRatings(5), workload: 5 } }],
     ["empty comment", { comment: "" }],
     ["blank comment", { comment: "   " }],
     ["non-text comment", { comment: 123 }],
-    ["extra property", { rating: 5, extra: true }],
-    ["createdAt property", { rating: 5, createdAt: "2025-01-10T12:00:00.000Z" }],
-    ["updatedAt property", { rating: 5, updatedAt: "2025-01-10T12:00:00.000Z" }],
+    ["extra property", { ratings: professorRatings(5), extra: true }],
+    ["createdAt property", { ratings: professorRatings(5), createdAt: "2025-01-10T12:00:00.000Z" }],
+    ["updatedAt property", { ratings: professorRatings(5), updatedAt: "2025-01-10T12:00:00.000Z" }],
   ])("rejects %s without querying repositories", async (_label, body) => {
     const findProfessorById = vi.fn();
     const updateReview = vi.fn();
@@ -890,7 +906,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       error: {
         code: "INVALID_REVIEW_UPDATE",
         message:
-          "Review update must contain only valid fields and include an integer rating from 1 to 5 and/or a non-empty comment of at most 500 characters.",
+          "Review update must contain a complete valid ratings object and/or a non-empty comment of at most 500 characters.",
       },
     });
     expect(findProfessorById).not.toHaveBeenCalled();
@@ -904,7 +920,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       const updateReview = vi.fn();
       const response = await request(createUpdateApp(findProfessorById, updateReview))
         .patch(`/professors/${id}/reviews/1`)
-        .send({ rating: 5 });
+        .send({ ratings: professorRatings(5) });
 
       expect(response.status).toBe(400);
       expect(response.body.error.code).toBe("INVALID_PROFESSOR_ID");
@@ -920,7 +936,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       const updateReview = vi.fn();
       const response = await request(createUpdateApp(findProfessorById, updateReview))
         .patch(`/professors/1/reviews/${id}`)
-        .send({ rating: 5 });
+        .send({ ratings: professorRatings(5) });
 
       expect(response.status).toBe(400);
       expect(response.body.error.code).toBe("INVALID_REVIEW_ID");
@@ -948,7 +964,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
     const updateReview = vi.fn();
     const response = await request(createUpdateApp(findProfessorById, updateReview))
       .patch("/professors/999999/reviews/1")
-      .send({ rating: 5 });
+      .send({ ratings: professorRatings(5) });
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("PROFESSOR_NOT_FOUND");
@@ -965,7 +981,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       createUpdateApp(vi.fn().mockResolvedValue(professor), updateReview),
     )
       .patch(`/professors/${professorId}/reviews/${reviewId}`)
-      .send({ rating: 5 });
+      .send({ ratings: professorRatings(5) });
 
     expect(response.status).toBe(404);
     expect(response.body).toStrictEqual({
@@ -975,7 +991,7 @@ describe("PATCH /professors/:professorId/reviews/:reviewId", () => {
       professorId,
       authorId: 1,
       reviewId,
-      rating: 5,
+      ratings: professorRatings(5),
     });
   });
 });

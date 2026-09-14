@@ -12,6 +12,8 @@ export type DisciplineListItem = {
   code: string;
   name: string;
   workloadHours: number;
+  reviewCount: number;
+  averageRating: number | null;
   department: Department;
   courses: Array<Pick<Course, "id" | "name">>;
 };

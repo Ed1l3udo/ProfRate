@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router";
 
 import { useAuth } from "../auth/AuthContext.js";
+import { ReviewsSection } from "../components/ProfessorReviews.js";
 import type { DisciplineDetails } from "../types/discipline.js";
 import { createDisciplineSearchParams, readDisciplineFilters } from "../utils/disciplineFilters.js";
 
@@ -74,6 +75,7 @@ export function DisciplineDetailsPage() {
             ))}</ul>
           )}
         </section>
+        <ReviewsSection target={{ targetType: "discipline", targetId: discipline.id }} />
         <Link className="back-link" to={returnTo}>Voltar para disciplinas</Link>
       </main>
     );

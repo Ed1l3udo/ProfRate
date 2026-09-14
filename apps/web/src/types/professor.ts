@@ -12,16 +12,4 @@ export type ProfessorDetails = {
   department: string;
 };
 
-export type Review = {
-  id: number;
-  professorId: number;
-  rating: number;
-  comment: string;
-  createdAt: string;
-  updatedAt: string;
-  canManage: boolean;
-};
-
-export type MyReview = Review & {
-  professor: { id: number; name: string };
-};
+export type { MyReview, ProfessorReview as Review } from "./review.js";

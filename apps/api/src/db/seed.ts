@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { closeDatabase, db } from "./client.js";
 import { createPasswordService } from "../modules/auth/password.js";
@@ -78,9 +78,12 @@ const seedProfessorDisciplines = [
 ];
 
 const seedReviews = [
-  { professorName: "Ada Ribeiro", rating: 5, comment: "Explicações claras e atividades bem organizadas." },
-  { professorName: "Ada Ribeiro", rating: 4, comment: "Feedbacks úteis durante os exercícios." },
-  { professorName: "Caio Nogueira", rating: 4, comment: "Aulas objetivas e exemplos práticos." },
+  { targetType: "professor" as const, professorName: "Ada Ribeiro", ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 }, comment: "Explicações claras e atividades bem organizadas." },
+  { targetType: "professor" as const, professorName: "Ada Ribeiro", ratings: { didactics: 4, clarity: 4, punctuality: 4, availability: 4 }, comment: "Feedbacks úteis durante os exercícios." },
+  { targetType: "professor" as const, professorName: "Caio Nogueira", ratings: { didactics: 4, clarity: 4, punctuality: 4, availability: 4 }, comment: "Aulas objetivas e exemplos práticos." },
+  { targetType: "discipline" as const, disciplineCode: "CMP101", ratings: { difficulty: 3, relevance: 5, workload: 4 }, comment: "Conteúdo introdutório bem distribuído ao longo das atividades." },
+  { targetType: "discipline" as const, disciplineCode: "CMP101", ratings: { difficulty: 4, relevance: 4, workload: 3 }, comment: "Exercícios fictícios ajudam a consolidar os fundamentos." },
+  { targetType: "discipline" as const, disciplineCode: "CDD101", ratings: { difficulty: 4, relevance: 5, workload: 4 }, comment: "Base matemática relevante para os módulos seguintes." },
 ];
 
 const seedUsers = [
@@ -212,18 +215,23 @@ try {
     }
 
     const existingReviews = await transaction
-      .select({ professorId: reviews.professorId, rating: reviews.rating, comment: reviews.comment })
-      .from(reviews);
+      .select({ professorId: reviews.professorId, disciplineId: reviews.disciplineId, comment: reviews.comment })
+      .from(reviews)
+      .where(isNull(reviews.authorId));
     const existingReviewKeys = new Set(
-      existingReviews.map(({ professorId, rating, comment }) => `${professorId}:${rating}:${comment}`),
+      existingReviews.map(({ professorId, disciplineId, comment }) => `${professorId ?? `d${disciplineId}`}:${comment}`),
     );
 
     for (const review of seedReviews) {
-      const professorId = requiredId(professorIds, review.professorName, "professor");
-      const reviewKey = `${professorId}:${review.rating}:${review.comment}`;
+      const targetId = review.targetType === "professor"
+        ? requiredId(professorIds, review.professorName, "professor")
+        : requiredId(disciplineIds, review.disciplineCode, "discipline");
+      const reviewKey = `${review.targetType === "professor" ? targetId : `d${targetId}`}:${review.comment}`;
 
       if (!existingReviewKeys.has(reviewKey)) {
-        await transaction.insert(reviews).values({ professorId, rating: review.rating, comment: review.comment });
+        await transaction.insert(reviews).values(review.targetType === "professor"
+          ? { professorId: targetId, ...review.ratings, comment: review.comment }
+          : { disciplineId: targetId, ...review.ratings, comment: review.comment });
         existingReviewKeys.add(reviewKey);
       }
     }

@@ -7,6 +7,13 @@ import { reviews, users } from "../../src/db/schema.js";
 import { getIntegrationContext, reviewFixtureTimestamp } from "./database.js";
 
 const isoUtcTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const professorRatings = (rating: number) => ({
+  didactics: rating,
+  clarity: rating,
+  punctuality: rating,
+  availability: rating,
+});
+const disciplineRatings = { difficulty: 3, relevance: 5, workload: 4 };
 
 function createIntegrationApp() {
   const {
@@ -74,13 +81,16 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
   const createResponse = await request(app)
     .post("/professors/1/reviews")
     .set("Authorization", authorization)
-    .send({ rating: 2, comment: "  Avaliação do fluxo HTTP.  " });
+    .send({ ratings: professorRatings(2), comment: "  Avaliação do fluxo HTTP.  " });
 
   expect(createResponse.status).toBe(201);
   expect(createResponse.body).toStrictEqual({
     id: 4,
     professorId: 1,
+    disciplineId: null,
+    targetType: "professor",
     rating: 2,
+    ratings: professorRatings(2),
     comment: "Avaliação do fluxo HTTP.",
     createdAt: expect.stringMatching(isoUtcTimestamp),
     updatedAt: expect.stringMatching(isoUtcTimestamp),
@@ -98,13 +108,16 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
   const updateResponse = await request(app)
     .patch(`/professors/1/reviews/${createResponse.body.id}`)
     .set("Authorization", authorization)
-    .send({ rating: 5, comment: "  Avaliação atualizada.  " });
+    .send({ ratings: professorRatings(5), comment: "  Avaliação atualizada.  " });
 
   expect(updateResponse.status).toBe(200);
   expect(updateResponse.body).toStrictEqual({
     id: 4,
     professorId: 1,
+    disciplineId: null,
+    targetType: "professor",
     rating: 5,
+    ratings: professorRatings(5),
     comment: "Avaliação atualizada.",
     createdAt: createResponse.body.createdAt,
     updatedAt: expect.stringMatching(isoUtcTimestamp),
@@ -162,7 +175,7 @@ it("enforces the 500-code-point comment limit through POST and PATCH", async () 
   const createResponse = await request(app)
     .post("/professors/1/reviews")
     .set("Authorization", authorization)
-    .send({ rating: 5, comment: emojiComment });
+    .send({ ratings: professorRatings(5), comment: emojiComment });
 
   expect(createResponse.status).toBe(201);
   expect(Array.from(createResponse.body.comment)).toHaveLength(500);
@@ -170,7 +183,7 @@ it("enforces the 500-code-point comment limit through POST and PATCH", async () 
   const rejectedCreateResponse = await request(app)
     .post("/professors/1/reviews")
     .set("Authorization", authorization)
-    .send({ rating: 5, comment: "a".repeat(501) });
+    .send({ ratings: professorRatings(5), comment: "a".repeat(501) });
 
   expect(rejectedCreateResponse.status).toBe(400);
   expect(rejectedCreateResponse.body.error.code).toBe("INVALID_REVIEW_INPUT");
@@ -266,7 +279,7 @@ it("enforces review ownership and preserves public legacy reviews", async () => 
   const createResponse = await request(app)
     .post("/professors/1/reviews")
     .set("Authorization", ownerAuthorization)
-    .send({ rating: 4, comment: "Review autenticada de integração." });
+    .send({ ratings: professorRatings(4), comment: "Review autenticada de integração." });
 
   expect(createResponse.status).toBe(201);
   const reviewId = createResponse.body.id as number;
@@ -279,7 +292,7 @@ it("enforces review ownership and preserves public legacy reviews", async () => 
   const forbiddenResponse = await request(app)
     .patch(`/professors/1/reviews/${reviewId}`)
     .set("Authorization", otherAuthorization)
-    .send({ rating: 1 });
+    .send({ ratings: professorRatings(1) });
   expect(forbiddenResponse.status).toBe(403);
   expect(forbiddenResponse.body.error.code).toBe("REVIEW_NOT_OWNED");
 
@@ -292,7 +305,7 @@ it("enforces review ownership and preserves public legacy reviews", async () => 
   const ownPatchResponse = await request(app)
     .patch(`/professors/1/reviews/${reviewId}`)
     .set("Authorization", ownerAuthorization)
-    .send({ rating: 5 });
+    .send({ ratings: professorRatings(5) });
   expect(ownPatchResponse.status).toBe(200);
   expect(ownPatchResponse.body.canManage).toBe(true);
 
@@ -306,7 +319,10 @@ it("enforces review ownership and preserves public legacy reviews", async () => 
   await database.db.insert(reviews).values({
     professorId: 1,
     authorId: null,
-    rating: 3,
+    didactics: 3,
+    clarity: 3,
+    punctuality: 3,
+    availability: 3,
     comment: "Review legada sem autor.",
   });
   const legacyResponse = await request(app).get("/professors/1/reviews");
@@ -320,4 +336,44 @@ it("enforces review ownership and preserves public legacy reviews", async () => 
     [reviewId],
   );
   expect(afterUserDelete.rows).toStrictEqual([{ author_id: null }]);
+});
+
+it("persists the discipline review lifecycle and protects crossed targets", async () => {
+  const app = createIntegrationApp();
+  const authorization = await studentAuthorization();
+  const createResponse = await request(app)
+    .post("/disciplines/1/reviews")
+    .set("Authorization", authorization)
+    .send({ ratings: disciplineRatings, comment: "  Disciplina de integração.  " });
+
+  expect(createResponse.status).toBe(201);
+  expect(createResponse.body).toMatchObject({
+    professorId: null,
+    disciplineId: 1,
+    targetType: "discipline",
+    rating: 4,
+    ratings: disciplineRatings,
+    comment: "Disciplina de integração.",
+    canManage: true,
+  });
+
+  const crossedResponse = await request(app)
+    .patch(`/disciplines/2/reviews/${createResponse.body.id}`)
+    .set("Authorization", authorization)
+    .send({ ratings: { difficulty: 5, relevance: 5, workload: 5 } });
+  expect(crossedResponse.status).toBe(404);
+
+  const updateResponse = await request(app)
+    .patch(`/disciplines/1/reviews/${createResponse.body.id}`)
+    .set("Authorization", authorization)
+    .send({ ratings: { difficulty: 5, relevance: 4, workload: 3 } });
+  expect(updateResponse.status).toBe(200);
+  expect(updateResponse.body.rating).toBe(4);
+
+  const deleteResponse = await request(app)
+    .delete(`/disciplines/1/reviews/${createResponse.body.id}`)
+    .set("Authorization", authorization);
+  expect(deleteResponse.status).toBe(204);
+  await expect(request(app).get("/disciplines/1/reviews"))
+    .resolves.toMatchObject({ status: 200, body: [] });
 });

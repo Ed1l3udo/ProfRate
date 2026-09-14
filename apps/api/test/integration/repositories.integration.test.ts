@@ -3,6 +3,20 @@ import { expect, it, vi } from "vitest";
 import { reviews } from "../../src/db/schema.js";
 import { getIntegrationContext, reviewFixtureTimestamp } from "./database.js";
 
+const professorRatings = (rating: number) => ({
+  didactics: rating,
+  clarity: rating,
+  punctuality: rating,
+  availability: rating,
+});
+
+const professorReviewContract = (rating: number) => ({
+  disciplineId: null,
+  targetType: "professor" as const,
+  ratings: professorRatings(rating),
+});
+const disciplineRatings = { difficulty: 3, relevance: 5, workload: 4 };
+
 function databaseErrorFieldFrom(
   error: unknown,
   field: "code" | "constraint",
@@ -89,6 +103,78 @@ it("has the explicit 500-character comment check constraint", async () => {
   ]);
 });
 
+it("creates a stored generated average and enforces the structured target constraints", async () => {
+  const { database, reviewsRepository } = getIntegrationContext();
+  const column = await database.pool.query<{ data_type: string; is_generated: string }>(`
+    SELECT data_type, is_generated
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'reviews' AND column_name = 'rating'
+  `);
+  expect(column.rows).toStrictEqual([{ data_type: "double precision", is_generated: "ALWAYS" }]);
+
+  const review = await reviewsRepository.createDisciplineReview({
+    disciplineId: 1,
+    authorId: 1,
+    ratings: disciplineRatings,
+    comment: "Avaliação estruturada de disciplina.",
+  });
+  expect(review).toMatchObject({
+    professorId: null,
+    disciplineId: 1,
+    targetType: "discipline",
+    rating: 4,
+    ratings: disciplineRatings,
+  });
+
+  const exactlyOneTargetConstraint = await database.pool.query<{ definition: string }>(`
+    SELECT pg_get_constraintdef(oid) AS definition
+    FROM pg_constraint
+    WHERE conname = 'reviews_exactly_one_target'
+  `);
+  expect(exactlyOneTargetConstraint.rows).toStrictEqual([
+    { definition: expect.stringContaining("professor_id") },
+  ]);
+
+  await expectSqlState(() => database.db.insert(reviews).values({
+    professorId: 1,
+    disciplineId: 1,
+    ...professorRatings(5),
+    comment: "Dois alvos não são permitidos.",
+  }), "23514");
+
+  const wrongShapeError = await captureDatabaseError(() => database.db.insert(reviews).values({
+    disciplineId: 1,
+    ...professorRatings(5),
+    ...disciplineRatings,
+    comment: "Critérios do alvo incorreto.",
+  }));
+  expect(databaseErrorFieldFrom(wrongShapeError, "constraint")).toBe("reviews_discipline_ratings_shape");
+});
+
+it("aggregates discipline reviews while preserving disciplines without reviews", async () => {
+  const { disciplinesRepository, reviewsRepository } = getIntegrationContext();
+  await reviewsRepository.createDisciplineReview({
+    disciplineId: 1,
+    authorId: 1,
+    ratings: disciplineRatings,
+    comment: "Primeira avaliação da disciplina.",
+  });
+  await reviewsRepository.createDisciplineReview({
+    disciplineId: 1,
+    authorId: 2,
+    ratings: { difficulty: 5, relevance: 5, workload: 5 },
+    comment: "Segunda avaliação da disciplina.",
+  });
+
+  const result = await disciplinesRepository.listDisciplines();
+  expect(result[0]).toMatchObject({ reviewCount: 2, averageRating: 4.5 });
+  expect(result[1]).toMatchObject({ reviewCount: 0, averageRating: null });
+  await expect(disciplinesRepository.findDisciplineById(1)).resolves.toMatchObject({
+    reviewCount: 2,
+    averageRating: 4.5,
+  });
+});
+
 it("normalizes professor departments with a required foreign key", async () => {
   const { database } = getIntegrationContext();
   const columns = await database.pool.query<{ column_name: string; is_nullable: string }>(`
@@ -134,6 +220,8 @@ it("lists disciplines with courses using a constant query count", async () => {
       code: "TST101",
       name: "Programação de Teste",
       workloadHours: 64,
+      reviewCount: 0,
+      averageRating: null,
       department: { id: 1, name: "Departamento Alfa" },
       courses: [{ id: 1, name: "Curso Alfa" }, { id: 2, name: "Curso Beta" }],
     },
@@ -142,6 +230,8 @@ it("lists disciplines with courses using a constant query count", async () => {
       code: "TST102",
       name: "Banco de Teste",
       workloadHours: 32,
+      reviewCount: 0,
+      averageRating: null,
       department: { id: 1, name: "Departamento Alfa" },
       courses: [{ id: 1, name: "Curso Alfa" }],
     },
@@ -150,6 +240,8 @@ it("lists disciplines with courses using a constant query count", async () => {
       code: "LAB201",
       name: "Laboratório Beta",
       workloadHours: 48,
+      reviewCount: 0,
+      averageRating: null,
       department: { id: 2, name: "Departamento Beta" },
       courses: [{ id: 2, name: "Curso Beta" }],
     },
@@ -169,6 +261,8 @@ it("combines discipline search, department, and course filters", async () => {
       code: "TST101",
       name: "Programação de Teste",
       workloadHours: 64,
+      reviewCount: 0,
+      averageRating: null,
       department: { id: 1, name: "Departamento Alfa" },
       courses: [{ id: 1, name: "Curso Alfa" }, { id: 2, name: "Curso Beta" }],
     },
@@ -183,6 +277,8 @@ it("returns discipline details with courses and professors", async () => {
     code: "TST101",
     name: "Programação de Teste",
     workloadHours: 64,
+    reviewCount: 0,
+    averageRating: null,
     department: { id: 1, name: "Departamento Alfa" },
     courses: [{ id: 1, name: "Curso Alfa" }, { id: 2, name: "Curso Beta" }],
     professors: [{ id: 1, name: "Alice Teste" }, { id: 2, name: "Bruno Teste" }],
@@ -289,7 +385,7 @@ it("recalculates review aggregates after create, update, and delete", async () =
   const createdReview = await reviewsRepository.createReview({
     professorId: 1,
     authorId: 1,
-    rating: 1,
+    ratings: professorRatings(1),
     comment: "Avaliação temporária para recalcular o resumo.",
   });
   const afterCreate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
@@ -301,7 +397,7 @@ it("recalculates review aggregates after create, update, and delete", async () =
     professorId: 1,
     authorId: 1,
     reviewId: createdReview.id,
-    rating: 4,
+    ratings: professorRatings(4),
   });
   const afterUpdate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
 
@@ -336,6 +432,7 @@ it("lists reviews ordered by id", async () => {
       id: 1,
       professorId: 1,
       rating: 5,
+      ...professorReviewContract(5),
       comment: "Primeira avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
       updatedAt: reviewFixtureTimestamp,
@@ -345,6 +442,7 @@ it("lists reviews ordered by id", async () => {
       id: 2,
       professorId: 1,
       rating: 4,
+      ...professorReviewContract(4),
       comment: "Segunda avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
       updatedAt: reviewFixtureTimestamp,
@@ -359,7 +457,7 @@ it("creates a review and returns the persisted columns", async () => {
   const review = await reviewsRepository.createReview({
     professorId: 3,
     authorId: 1,
-    rating: 2,
+    ratings: professorRatings(2),
     comment: "Avaliação criada no teste.",
   });
 
@@ -367,6 +465,7 @@ it("creates a review and returns the persisted columns", async () => {
     id: 4,
     professorId: 3,
     rating: 2,
+    ...professorReviewContract(2),
     comment: "Avaliação criada no teste.",
     createdAt: expect.any(Date),
     updatedAt: expect.any(Date),
@@ -384,7 +483,7 @@ it("persists exactly 500 comment code points through the repository", async () =
   const review = await reviewsRepository.createReview({
     professorId: 3,
     authorId: 1,
-    rating: 5,
+    ratings: professorRatings(5),
     comment,
   });
   const result = await database.pool.query<{ character_count: number }>(
@@ -403,7 +502,7 @@ it.each([
 ])("rejects 501 %s code points through the named database constraint", async (_label, comment) => {
   const { database } = getIntegrationContext();
   const error = await captureDatabaseError(() =>
-    database.db.insert(reviews).values({ professorId: 1, rating: 5, comment }),
+    database.db.insert(reviews).values({ professorId: 1, ...professorRatings(5), comment }),
   );
 
   expect(databaseErrorFieldFrom(error, "code")).toBe("23514");
@@ -419,13 +518,14 @@ it("partially updates a review", async () => {
     professorId: 1,
     authorId: 1,
     reviewId: 1,
-    rating: 2,
+    ratings: professorRatings(2),
   });
 
   expect(review).toStrictEqual({
     id: 1,
     professorId: 1,
     rating: 2,
+    ...professorReviewContract(2),
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: expect.any(Date),
@@ -444,7 +544,7 @@ it("does not update a review through another professor", async () => {
       professorId: 2,
       authorId: 1,
       reviewId: 1,
-      rating: 1,
+      ratings: professorRatings(1),
     }),
   ).resolves.toBeUndefined();
   await expect(
@@ -453,6 +553,7 @@ it("does not update a review through another professor", async () => {
     id: 1,
     professorId: 1,
     rating: 5,
+    ...professorReviewContract(5),
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: reviewFixtureTimestamp,
@@ -465,14 +566,7 @@ it("deletes a review", async () => {
 
   await expect(
     reviewsRepository.deleteReview({ professorId: 1, reviewId: 1, authorId: 1 }),
-  ).resolves.toStrictEqual({
-    id: 1,
-    professorId: 1,
-    rating: 5,
-    comment: "Primeira avaliação de teste.",
-    createdAt: reviewFixtureTimestamp,
-    updatedAt: reviewFixtureTimestamp,
-  });
+  ).resolves.toStrictEqual({ id: 1 });
   await expect(
     reviewsRepository.listReviewsByProfessorId(1),
   ).resolves.toHaveLength(1);
@@ -490,6 +584,7 @@ it("does not delete a review through another professor", async () => {
     id: 1,
     professorId: 1,
     rating: 5,
+    ...professorReviewContract(5),
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: reviewFixtureTimestamp,
@@ -505,7 +600,7 @@ it("rejects a review for a missing professor through the foreign key", async () 
       reviewsRepository.createReview({
         professorId: 999_999,
         authorId: 1,
-        rating: 5,
+        ratings: professorRatings(5),
         comment: "Professor inexistente.",
       }),
     "23503",
@@ -522,7 +617,7 @@ it.each([0, 6])(
         reviewsRepository.createReview({
           professorId: 1,
           authorId: 1,
-          rating,
+          ratings: professorRatings(rating),
           comment: "Nota inválida.",
         }),
       "23514",
@@ -537,7 +632,7 @@ it("rejects a blank comment through the database check constraint", async () => 
     () =>
       database.db.insert(reviews).values({
         professorId: 1,
-        rating: 5,
+        ...professorRatings(5),
         comment: "   ",
       }),
     "23514",

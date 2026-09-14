@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "../auth/AuthContext.js";
 import { ReviewItem } from "../components/ReviewItem.js";
-import type { MyReview } from "../types/professor.js";
+import type { MyReview, Review } from "../types/review.js";
 
 type LoadState = "loading" | "success" | "error";
 
@@ -28,9 +28,11 @@ export function MyReviewsPage() {
     return () => controller.abort();
   }, [apiFetch]);
 
-  function handleUpdated(updated: MyReview) {
+  function handleUpdated(updated: Review) {
     setReviews((current) => current.map((review) =>
-      review.id === updated.id ? { ...review, ...updated } : review,
+      review.id === updated.id && review.targetType === updated.targetType
+        ? ({ ...review, ...updated } as MyReview)
+        : review,
     ));
   }
 
@@ -45,11 +47,12 @@ export function MyReviewsPage() {
           {reviews.map((review) => (
             <ReviewItem
               key={review.id}
-              professorId={review.professorId}
-              professor={review.professor}
               review={review}
+              subject={review.targetType === "professor"
+                ? { label: "Professor", text: review.professor.name, to: `/professors/${review.professorId}` }
+                : { label: "Disciplina", text: `${review.discipline.code} — ${review.discipline.name}`, to: `/disciplines/${review.disciplineId}` }}
               onDeleted={(id) => setReviews((current) => current.filter((item) => item.id !== id))}
-              onUpdated={(updated) => handleUpdated({ ...review, ...updated })}
+              onUpdated={handleUpdated}
             />
           ))}
         </ul>

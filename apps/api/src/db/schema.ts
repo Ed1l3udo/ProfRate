@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  doublePrecision,
   index,
   integer,
   pgTable,
@@ -131,12 +132,28 @@ export const reviews = pgTable(
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     professorId: integer("professor_id")
-      .notNull()
       .references(() => professors.id, { onDelete: "cascade" }),
+    disciplineId: integer("discipline_id").references(() => disciplines.id, {
+      onDelete: "cascade",
+    }),
     authorId: integer("author_id").references(() => users.id, {
       onDelete: "set null",
     }),
-    rating: integer("rating").notNull(),
+    didactics: integer("didactics"),
+    clarity: integer("clarity"),
+    punctuality: integer("punctuality"),
+    availability: integer("availability"),
+    difficulty: integer("difficulty"),
+    relevance: integer("relevance"),
+    workload: integer("workload"),
+    rating: doublePrecision("rating")
+      .notNull()
+      .generatedAlwaysAs(sql`case
+        when "professor_id" is not null then
+          ("didactics" + "clarity" + "punctuality" + "availability") / 4.0
+        else
+          ("difficulty" + "relevance" + "workload") / 3.0
+      end`),
     comment: text("comment").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
@@ -146,9 +163,48 @@ export const reviews = pgTable(
       .defaultNow(),
   },
   (table) => [
-    check("reviews_rating_between_1_and_5", sql`${table.rating} BETWEEN 1 AND 5`),
+    check(
+      "reviews_exactly_one_target",
+      sql`(${table.professorId} is not null) <> (${table.disciplineId} is not null)`,
+    ),
+    check(
+      "reviews_professor_ratings_shape",
+      sql`${table.professorId} is null or (
+        ${table.didactics} is not null and
+        ${table.clarity} is not null and
+        ${table.punctuality} is not null and
+        ${table.availability} is not null and
+        ${table.difficulty} is null and
+        ${table.relevance} is null and
+        ${table.workload} is null
+      )`,
+    ),
+    check(
+      "reviews_discipline_ratings_shape",
+      sql`${table.disciplineId} is null or (
+        ${table.difficulty} is not null and
+        ${table.relevance} is not null and
+        ${table.workload} is not null and
+        ${table.didactics} is null and
+        ${table.clarity} is null and
+        ${table.punctuality} is null and
+        ${table.availability} is null
+      )`,
+    ),
+    check(
+      "reviews_ratings_between_1_and_5",
+      sql`(${table.didactics} is null or ${table.didactics} between 1 and 5) and
+        (${table.clarity} is null or ${table.clarity} between 1 and 5) and
+        (${table.punctuality} is null or ${table.punctuality} between 1 and 5) and
+        (${table.availability} is null or ${table.availability} between 1 and 5) and
+        (${table.difficulty} is null or ${table.difficulty} between 1 and 5) and
+        (${table.relevance} is null or ${table.relevance} between 1 and 5) and
+        (${table.workload} is null or ${table.workload} between 1 and 5)`,
+    ),
     check("reviews_comment_not_blank", sql`length(trim(${table.comment})) > 0`),
     check("reviews_comment_max_500", sql`char_length(${table.comment}) <= 500`),
+    index("reviews_professor_id_idx").on(table.professorId),
+    index("reviews_discipline_id_idx").on(table.disciplineId),
     index("reviews_author_id_idx").on(table.authorId),
   ],
 );

@@ -104,11 +104,18 @@ const linaListItem = {
   averageRating: null,
 };
 
+const professorReviewFields = (rating: number) => ({
+  disciplineId: null,
+  targetType: "professor" as const,
+  ratings: { didactics: rating, clarity: rating, punctuality: rating, availability: rating },
+});
+
 const adaReviews = [
   {
     id: 1,
     professorId: 1,
     rating: 5,
+    ...professorReviewFields(5),
     comment: "Explicações claras e atividades bem organizadas.",
     createdAt: "2025-01-10T12:00:00.000Z",
     updatedAt: "2025-01-10T12:00:00.000Z",
@@ -118,6 +125,7 @@ const adaReviews = [
     id: 2,
     professorId: 1,
     rating: 4,
+    ...professorReviewFields(4),
     comment: "Feedbacks úteis durante os exercícios.",
     createdAt: "2025-01-10T12:00:00.000Z",
     updatedAt: "2025-01-10T12:00:00.000Z",
@@ -130,6 +138,7 @@ const orderedReviews: Review[] = [
     id: 1,
     professorId: 1,
     rating: 3,
+    ...professorReviewFields(3),
     comment: "Nota três mais antiga.",
     createdAt: "2025-01-01T12:00:00.000Z",
     updatedAt: "2025-01-01T12:00:00.000Z",
@@ -139,6 +148,7 @@ const orderedReviews: Review[] = [
     id: 2,
     professorId: 1,
     rating: 5,
+    ...professorReviewFields(5),
     comment: "Nota cinco recente de id menor.",
     createdAt: "2025-01-03T12:00:00.000Z",
     updatedAt: "2025-01-03T12:00:00.000Z",
@@ -148,6 +158,7 @@ const orderedReviews: Review[] = [
     id: 3,
     professorId: 1,
     rating: 5,
+    ...professorReviewFields(5),
     comment: "Nota cinco recente de id maior.",
     createdAt: "2025-01-03T12:00:00.000Z",
     updatedAt: "2025-01-03T12:00:00.000Z",
@@ -157,6 +168,7 @@ const orderedReviews: Review[] = [
     id: 4,
     professorId: 1,
     rating: 1,
+    ...professorReviewFields(1),
     comment: "Nota um de id menor.",
     createdAt: "2025-01-02T12:00:00.000Z",
     updatedAt: "2025-01-02T12:00:00.000Z",
@@ -166,6 +178,7 @@ const orderedReviews: Review[] = [
     id: 5,
     professorId: 1,
     rating: 1,
+    ...professorReviewFields(1),
     comment: "Nota um de id maior.",
     createdAt: "2025-01-02T12:00:00.000Z",
     updatedAt: "2025-01-02T12:00:00.000Z",
@@ -175,6 +188,7 @@ const orderedReviews: Review[] = [
     id: 6,
     professorId: 1,
     rating: 5,
+    ...professorReviewFields(5),
     comment: "Nota cinco antiga.",
     createdAt: "2024-12-31T12:00:00.000Z",
     updatedAt: "2024-12-31T12:00:00.000Z",
@@ -184,6 +198,7 @@ const orderedReviews: Review[] = [
     id: 7,
     professorId: 1,
     rating: 2,
+    ...professorReviewFields(2),
     comment: "Nota dois.",
     createdAt: "2025-01-02T10:00:00.000Z",
     updatedAt: "2025-01-02T10:00:00.000Z",
@@ -193,6 +208,7 @@ const orderedReviews: Review[] = [
     id: 8,
     professorId: 1,
     rating: 4,
+    ...professorReviewFields(4),
     comment: "Nota quatro.",
     createdAt: "2025-01-02T11:00:00.000Z",
     updatedAt: "2025-01-02T11:00:00.000Z",
@@ -223,6 +239,15 @@ function expectReviewOrder(comments: string[]) {
   comments.forEach((comment, index) => {
     expect(within(items[index]).getByText(comment)).toBeInTheDocument();
   });
+}
+
+function fillProfessorRatings(
+  query: typeof screen | ReturnType<typeof within>,
+  value: string,
+) {
+  for (const label of ["Didática", "Clareza", "Pontualidade", "Disponibilidade"]) {
+    fireEvent.change(query.getByLabelText(label), { target: { value } });
+  }
 }
 
 afterEach(() => {
@@ -770,14 +795,14 @@ describe("professor details", () => {
 
     renderApp("/professors/1");
 
-    expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    expect(await screen.findByText("Média geral: 5,0/5")).toBeInTheDocument();
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("2 avaliações");
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 4,5/5");
     expect(screen.getByRole("heading", { name: "Nova avaliação" })).toBeInTheDocument();
     const creationComment = screen.getByLabelText("Comentário");
     expect(creationComment).toHaveAttribute("aria-describedby", "review-comment-count");
     expect(screen.getByText("0/500 caracteres")).not.toHaveAttribute("aria-live");
-    expect(screen.getByText("Nota: 4/5")).toBeInTheDocument();
+    expect(screen.getByText("Média geral: 4,0/5")).toBeInTheDocument();
     expect(
       screen.getByText("Explicações claras e atividades bem organizadas."),
     ).toBeInTheDocument();
@@ -813,7 +838,7 @@ describe("professor details", () => {
       "/professors/1?search=ada&search=caio&department=%20aurora%20&extra=value",
     );
 
-    expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    expect(await screen.findByText("Média geral: 5,0/5")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voltar para a lista" })).toHaveAttribute(
       "href",
       "/?department=aurora",
@@ -865,7 +890,7 @@ describe("professor details", () => {
 
     renderApp("/professors/1");
 
-    expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
+    expect(await screen.findByText("Média geral: 5,0/5")).toBeInTheDocument();
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("1 avaliação");
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 5,0/5");
   });
@@ -880,6 +905,7 @@ describe("professor details", () => {
       id: 3,
       professorId: 1,
       rating: 5,
+      ...professorReviewFields(5),
       comment: "Comentário normalizado.",
       createdAt: "2025-01-10T12:00:00.000Z",
       updatedAt: "2025-01-10T12:00:00.000Z",
@@ -904,8 +930,8 @@ describe("professor details", () => {
 
     renderApp("/professors/1");
 
-    expect(await screen.findByText("Nota: 5/5")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "5" } });
+    expect(await screen.findByText("Média geral: 5,0/5")).toBeInTheDocument();
+    fillProfessorRatings(screen, "5");
     fireEvent.change(screen.getByLabelText("Comentário"), {
       target: { value: "  Comentário digitado  " },
     });
@@ -921,7 +947,7 @@ describe("professor details", () => {
       signal: expect.any(AbortSignal),
     });
     expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({
-      rating: 5,
+      ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 },
       comment: "  Comentário digitado  ",
     });
 
@@ -933,7 +959,9 @@ describe("professor details", () => {
     );
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("3 avaliações");
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 4,7/5");
-    expect(screen.getByLabelText("Nota")).toHaveValue(null);
+    for (const label of ["Didática", "Clareza", "Pontualidade", "Disponibilidade"]) {
+      expect(screen.getByLabelText(label)).toHaveValue("");
+    }
     expect(screen.getByLabelText("Comentário")).toHaveValue("");
     expect(
       fetchMock.mock.calls.filter(
@@ -947,6 +975,7 @@ describe("professor details", () => {
       id: 3,
       professorId: 1,
       rating: 4,
+      ...professorReviewFields(4),
       comment: "Primeira avaliação.",
       createdAt: "2025-01-10T12:00:00.000Z",
       updatedAt: "2025-01-10T12:00:00.000Z",
@@ -971,7 +1000,7 @@ describe("professor details", () => {
 
     renderApp("/professors/1");
     expect(await screen.findByText("Nenhuma avaliação ainda.")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "4" } });
+    fillProfessorRatings(screen, "4");
     fireEvent.change(screen.getByLabelText("Comentário"), {
       target: { value: "Primeira avaliação." },
     });
@@ -1022,7 +1051,7 @@ describe("professor details", () => {
     await screen.findByRole("heading", { name: "Nova avaliação" });
     const comment = screen.getByLabelText("Comentário");
 
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "5" } });
+    fillProfessorRatings(screen, "5");
     fireEvent.change(comment, { target: { value: "🙂".repeat(501) } });
     fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
 
@@ -1063,14 +1092,14 @@ describe("professor details", () => {
 
     renderApp("/professors/1");
     await screen.findByRole("heading", { name: "Nova avaliação" });
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: invalidRating } });
+    fillProfessorRatings(screen, invalidRating);
     fireEvent.change(screen.getByLabelText("Comentário"), {
       target: { value: invalidComment },
     });
     fireEvent.click(screen.getByRole("button", { name: "Enviar avaliação" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Preencha uma nota de 1 a 5 e um comentário.",
+      "Selecione notas de 1 a 5 para todos os critérios e escreva um comentário.",
     );
     expect(
       fetchMock.mock.calls.some(
@@ -1103,7 +1132,7 @@ describe("professor details", () => {
 
     renderApp("/professors/1");
     await screen.findByRole("heading", { name: "Nova avaliação" });
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "5" } });
+    fillProfessorRatings(screen, "5");
     fireEvent.change(screen.getByLabelText("Comentário"), {
       target: { value: "Comentário" },
     });
@@ -1382,12 +1411,12 @@ describe("review filtering and ordering", () => {
     const order = screen.getByLabelText("Ordenar avaliações");
 
     expect(within(filter).getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "Todas as notas",
-      "Nota 5",
-      "Nota 4",
-      "Nota 3",
-      "Nota 2",
-      "Nota 1",
+      "Todas as médias",
+      "Média de 5,0",
+      "Média entre 4,0 e 4,9",
+      "Média entre 3,0 e 3,9",
+      "Média entre 2,0 e 2,9",
+      "Média entre 1,0 e 1,9",
     ]);
     expect(within(order).getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Mais recentes",
@@ -1409,6 +1438,7 @@ describe("review filtering and ordering", () => {
       id: 3,
       professorId: 1,
       rating: 3,
+      ...professorReviewFields(3),
       comment: "Avaliação recém-criada.",
       createdAt: "2025-01-11T12:00:00.000Z",
       updatedAt: "2025-01-11T12:00:00.000Z",
@@ -1433,7 +1463,7 @@ describe("review filtering and ordering", () => {
     fireEvent.change(screen.getByLabelText("Ordenar avaliações"), {
       target: { value: "oldest" },
     });
-    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "3" } });
+    fillProfessorRatings(screen, "3");
     fireEvent.change(screen.getByLabelText("Comentário"), {
       target: { value: "Avaliação recém-criada." },
     });
@@ -1458,6 +1488,7 @@ describe("review filtering and ordering", () => {
     const updatedReview = {
       ...adaReviews[0],
       rating: 3,
+      ...professorReviewFields(3),
       comment: "Avaliação com nota editada.",
       updatedAt: "2025-01-11T14:30:00.000Z",
       canManage: true,
@@ -1489,7 +1520,7 @@ describe("review filtering and ordering", () => {
     }
     const card = within(targetCard);
     fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
-    fireEvent.change(card.getByLabelText("Nota"), { target: { value: "3" } });
+    fillProfessorRatings(card, "3");
     fireEvent.change(card.getByLabelText("Comentário"), {
       target: { value: "Avaliação com nota editada." },
     });
@@ -1859,13 +1890,13 @@ describe("review editing", () => {
     let card = getFirstReviewCard();
     fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
 
-    expect(card.getByLabelText("Nota")).toHaveValue(5);
+    expect(card.getByLabelText("Didática")).toHaveValue("5");
     expect(card.getByLabelText("Comentário")).toHaveValue(
       "Explicações claras e atividades bem organizadas.",
     );
     expect(card.queryByRole("button", { name: "Excluir avaliação" })).not.toBeInTheDocument();
     expect(card.queryByText("Deseja excluir esta avaliação?")).not.toBeInTheDocument();
-    fireEvent.change(card.getByLabelText("Nota"), { target: { value: "2" } });
+    fillProfessorRatings(card, "2");
     fireEvent.change(card.getByLabelText("Comentário"), {
       target: { value: "Rascunho" },
     });
@@ -1873,7 +1904,7 @@ describe("review editing", () => {
 
     card = getFirstReviewCard();
     fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
-    expect(card.getByLabelText("Nota")).toHaveValue(5);
+    expect(card.getByLabelText("Didática")).toHaveValue("5");
     expect(card.getByLabelText("Comentário")).toHaveValue(
       "Explicações claras e atividades bem organizadas.",
     );
@@ -1956,12 +1987,12 @@ describe("review editing", () => {
     await screen.findByText("Explicações claras e atividades bem organizadas.");
     const card = getFirstReviewCard();
     fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
-    fireEvent.change(card.getByLabelText("Nota"), { target: { value: rating } });
+    fillProfessorRatings(card, rating);
     fireEvent.change(card.getByLabelText("Comentário"), { target: { value: comment } });
     fireEvent.click(card.getByRole("button", { name: "Salvar alterações" }));
 
     expect(card.getByRole("alert")).toHaveTextContent(
-      "Preencha uma nota de 1 a 5 e um comentário.",
+      "Selecione notas de 1 a 5 para todos os critérios e escreva um comentário.",
     );
     expect(fetchMock.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
   });
@@ -1976,6 +2007,7 @@ describe("review editing", () => {
       id: 1,
       professorId: 1,
       rating: 3,
+      ...professorReviewFields(3),
       comment: "Comentário atualizado.",
       createdAt: "2025-01-10T12:00:00.000Z",
       updatedAt: "2025-01-11T14:30:00.000Z",
@@ -1998,7 +2030,7 @@ describe("review editing", () => {
     await screen.findByText("Explicações claras e atividades bem organizadas.");
     const card = getFirstReviewCard();
     fireEvent.click(card.getByRole("button", { name: "Editar avaliação" }));
-    fireEvent.change(card.getByLabelText("Nota"), { target: { value: "3" } });
+    fillProfessorRatings(card, "3");
     fireEvent.change(card.getByLabelText("Comentário"), {
       target: { value: "  Comentário atualizado.  " },
     });
@@ -2009,7 +2041,7 @@ describe("review editing", () => {
       saveButton.click();
     });
 
-    expect(card.getByLabelText("Nota")).toBeDisabled();
+    expect(card.getByLabelText("Didática")).toBeDisabled();
     expect(card.getByLabelText("Comentário")).toBeDisabled();
     expect(card.getByRole("button", { name: "Salvando..." })).toBeDisabled();
     expect(card.getByRole("button", { name: "Cancelar edição" })).toBeDisabled();
@@ -2024,7 +2056,7 @@ describe("review editing", () => {
       signal: expect.any(AbortSignal),
     });
     expect(JSON.parse(String(patchCalls[0]?.[1]?.body))).toStrictEqual({
-      rating: 3,
+      ratings: { didactics: 3, clarity: 3, punctuality: 3, availability: 3 },
       comment: "  Comentário atualizado.  ",
     });
 
@@ -2036,7 +2068,7 @@ describe("review editing", () => {
     expect(screen.getByText("Comentário atualizado.")).toBeInTheDocument();
     expect(card.getByText(/Criada em:/)).toHaveTextContent("Criada em: 10/01/2025, 12:00 UTC");
     expect(card.getByText(/Atualizada em:/)).toHaveTextContent("Atualizada em: 11/01/2025, 14:30 UTC");
-    expect(screen.getByText("Nota: 3/5")).toBeInTheDocument();
+    expect(screen.getByText("Média geral: 3,0/5")).toBeInTheDocument();
     expect(screen.getByLabelText("Resumo das avaliações")).toHaveTextContent("Média: 3,5/5");
     expect(
       fetchMock.mock.calls.filter(

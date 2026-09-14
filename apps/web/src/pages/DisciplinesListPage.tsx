@@ -153,6 +153,14 @@ export function DisciplinesListPage() {
               <h2>{discipline.name}</h2>
               <p>{discipline.department.name} · {discipline.workloadHours} horas</p>
               <p>{discipline.courses.length === 0 ? "Sem cursos relacionados" : discipline.courses.map(({ name }) => name).join(", ")}</p>
+              <div className="discipline-review-summary" aria-label={`Resumo de avaliações de ${discipline.code}`}>
+                {discipline.reviewCount === 0 ? <span>Sem avaliações</span> : (
+                  <>
+                    <span>{discipline.reviewCount} {discipline.reviewCount === 1 ? "avaliação" : "avaliações"}</span>
+                    <span>Média: {discipline.averageRating?.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/5</span>
+                  </>
+                )}
+              </div>
               <Link to={canonicalSearchParams === "" ? `/disciplines/${discipline.id}` : `/disciplines/${discipline.id}?${canonicalSearchParams}`}>
                 Ver detalhes
               </Link>

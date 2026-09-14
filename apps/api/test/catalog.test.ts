@@ -7,7 +7,10 @@ const currentDependencies = {
   createReview: async () => ({
     id: 1,
     professorId: 1,
+    disciplineId: null,
+    targetType: "professor" as const,
     rating: 5,
+    ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 },
     comment: "Teste",
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -19,6 +22,56 @@ const currentDependencies = {
   listReviewsByProfessorId: async () => [],
   updateReview: async () => undefined,
 };
+
+const timestamp = new Date("2026-01-10T12:00:00.000Z");
+const disciplineRatings = { difficulty: 3, relevance: 5, workload: 4 };
+const student = {
+  id: 7,
+  name: "Lia Estudante",
+  email: "lia@student.profrate.test",
+  passwordHash: "hash-de-teste",
+  role: "student" as const,
+  courseId: 1,
+  course: { id: 1, name: "Computação Aplicada" },
+  active: true,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+};
+const discipline = {
+  id: 1,
+  code: "CMP101",
+  name: "Fundamentos de Programação",
+  workloadHours: 64,
+  reviewCount: 2,
+  averageRating: 4,
+  department: { id: 1, name: "Departamento Aurora" },
+  courses: [{ id: 1, name: "Computação Aplicada" }],
+  professors: [],
+};
+const disciplineReview = {
+  id: 4,
+  professorId: null,
+  disciplineId: 1,
+  targetType: "discipline" as const,
+  rating: 4,
+  ratings: disciplineRatings,
+  comment: "Conteúdo bem distribuído.",
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  canManage: true,
+};
+
+function authenticatedDependencies(overrides: Record<string, unknown> = {}) {
+  return {
+    ...currentDependencies,
+    findDisciplineById: async () => discipline,
+    findUserById: async () => student,
+    verifyToken: async () => ({ userId: student.id, role: "student" as const }),
+    ...overrides,
+  };
+}
+
+const bearer = { Authorization: "Bearer valid-token" };
 
 describe("academic catalog endpoints", () => {
   it("returns departments from the injected repository", async () => {
@@ -134,5 +187,111 @@ describe("academic catalog endpoints", () => {
       error: { code: "DISCIPLINE_NOT_FOUND", message: "Discipline not found." },
     });
     expect(findDisciplineById).toHaveBeenCalledWith(999);
+  });
+});
+
+describe("discipline review endpoints", () => {
+  it("lists public reviews and calculates canManage only for an authenticated owner", async () => {
+    const listReviewsByDisciplineId = vi.fn().mockResolvedValue([disciplineReview]);
+    const publicResponse = await request(createApp({
+      ...currentDependencies,
+      findDisciplineById: async () => discipline,
+      listReviewsByDisciplineId,
+    })).get("/disciplines/1/reviews");
+
+    expect(publicResponse.status).toBe(200);
+    expect(listReviewsByDisciplineId).toHaveBeenNthCalledWith(1, 1);
+
+    const authenticatedResponse = await request(createApp(authenticatedDependencies({
+      listReviewsByDisciplineId,
+    }))).get("/disciplines/1/reviews").set(bearer);
+
+    expect(authenticatedResponse.status).toBe(200);
+    expect(authenticatedResponse.text).not.toContain("authorId");
+    expect(listReviewsByDisciplineId).toHaveBeenNthCalledWith(2, 1, student.id);
+  });
+
+  it("creates a discipline review from complete criteria without accepting a client average", async () => {
+    const createDisciplineReview = vi.fn().mockResolvedValue(disciplineReview);
+    const response = await request(createApp(authenticatedDependencies({ createDisciplineReview })))
+      .post("/disciplines/1/reviews")
+      .set(bearer)
+      .send({ ratings: disciplineRatings, comment: "  Conteúdo bem distribuído.  " });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ targetType: "discipline", rating: 4, ratings: disciplineRatings });
+    expect(createDisciplineReview).toHaveBeenCalledWith({
+      disciplineId: 1,
+      authorId: student.id,
+      ratings: disciplineRatings,
+      comment: "Conteúdo bem distribuído.",
+    });
+  });
+
+  it.each([
+    ["missing criterion", { ratings: { difficulty: 3, relevance: 5 }, comment: "Comentário válido." }],
+    ["wrong criterion", { ratings: { ...disciplineRatings, didactics: 5 }, comment: "Comentário válido." }],
+    ["criterion below range", { ratings: { ...disciplineRatings, difficulty: 0 }, comment: "Comentário válido." }],
+    ["criterion above range", { ratings: { ...disciplineRatings, workload: 6 }, comment: "Comentário válido." }],
+    ["client rating", { ratings: disciplineRatings, rating: 4, comment: "Comentário válido." }],
+  ])("rejects %s before repository access", async (_label, body) => {
+    const createDisciplineReview = vi.fn();
+    const findDisciplineById = vi.fn();
+    const response = await request(createApp(authenticatedDependencies({
+      createDisciplineReview,
+      findDisciplineById,
+    }))).post("/disciplines/1/reviews").set(bearer).send(body);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("INVALID_REVIEW_INPUT");
+    expect(findDisciplineById).not.toHaveBeenCalled();
+    expect(createDisciplineReview).not.toHaveBeenCalled();
+  });
+
+  it("updates all discipline criteria and the comment in one PATCH", async () => {
+    const updateDisciplineReview = vi.fn().mockResolvedValue(disciplineReview);
+    const response = await request(createApp(authenticatedDependencies({
+      findDisciplineReviewOwnership: async () => ({ authorId: student.id }),
+      updateDisciplineReview,
+    }))).patch("/disciplines/1/reviews/4").set(bearer).send({
+      ratings: disciplineRatings,
+      comment: "  Conteúdo bem distribuído.  ",
+    });
+
+    expect(response.status).toBe(200);
+    expect(updateDisciplineReview).toHaveBeenCalledWith({
+      disciplineId: 1,
+      reviewId: 4,
+      authorId: student.id,
+      ratings: disciplineRatings,
+      comment: "Conteúdo bem distribuído.",
+    });
+  });
+
+  it("protects a discipline review owned by another student", async () => {
+    const updateDisciplineReview = vi.fn();
+    const response = await request(createApp(authenticatedDependencies({
+      findDisciplineReviewOwnership: async () => ({ authorId: 99 }),
+      updateDisciplineReview,
+    }))).patch("/disciplines/1/reviews/4").set(bearer).send({ ratings: disciplineRatings });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("REVIEW_NOT_OWNED");
+    expect(updateDisciplineReview).not.toHaveBeenCalled();
+  });
+
+  it("deletes only with discipline, review, and author ownership", async () => {
+    const deleteDisciplineReview = vi.fn().mockResolvedValue({ id: 4 });
+    const response = await request(createApp(authenticatedDependencies({
+      deleteDisciplineReview,
+      findDisciplineReviewOwnership: async () => ({ authorId: student.id }),
+    }))).delete("/disciplines/1/reviews/4").set(bearer);
+
+    expect(response.status).toBe(204);
+    expect(deleteDisciplineReview).toHaveBeenCalledWith({
+      disciplineId: 1,
+      reviewId: 4,
+      authorId: student.id,
+    });
   });
 });

@@ -150,7 +150,11 @@ describe("academic catalog pages", () => {
   });
 
   it("shows details, professor links, and a return link preserving filters", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => disciplineDetails });
+    const fetchMock = vi.fn((url: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => url === "/api/disciplines/1/reviews" ? [] : disciplineDetails,
+    }));
     vi.stubGlobal("fetch", fetchMock);
     renderApp("/disciplines/1?search=prog&departmentId=1&unknown=x");
 
@@ -161,7 +165,7 @@ describe("academic catalog pages", () => {
       "href",
       "/disciplines?search=prog&departmentId=1",
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenCalledWith("/api/disciplines/1", expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 

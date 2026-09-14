@@ -31,7 +31,10 @@ function dependencies(overrides: Record<string, unknown> = {}) {
     createReview: async () => ({
       id: 10,
       professorId: 1,
+      disciplineId: null,
+      targetType: "professor" as const,
       rating: 5,
+      ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 },
       comment: "Ótima organização.",
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -242,7 +245,10 @@ describe("review authorization", () => {
     const response = await request(createApp(dependencies({ createReview })))
       .post("/professors/1/reviews")
       .set(bearer)
-      .send({ rating: 5, comment: "Ótima organização." });
+      .send({
+        ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 },
+        comment: "Ótima organização.",
+      });
 
     expect(response.status).toBe(201);
     expect(createReview).toHaveBeenCalledWith(expect.objectContaining({ authorId: 7 }));
@@ -255,7 +261,9 @@ describe("review authorization", () => {
     const response = await request(createApp(dependencies({
       findReviewOwnership: async () => ({ authorId: 99 }),
       updateReview,
-    }))).patch("/professors/1/reviews/2").set(bearer).send({ rating: 4 });
+    }))).patch("/professors/1/reviews/2").set(bearer).send({
+      ratings: { didactics: 4, clarity: 4, punctuality: 4, availability: 4 },
+    });
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("REVIEW_NOT_OWNED");
@@ -268,7 +276,10 @@ describe("review authorization", () => {
       createReview,
       findUserById: async () => moderator,
       verifyToken: async () => ({ userId: moderator.id, role: "moderator" as const }),
-    }))).post("/professors/1/reviews").set(bearer).send({ rating: 5, comment: "Teste" });
+    }))).post("/professors/1/reviews").set(bearer).send({
+      ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 },
+      comment: "Teste",
+    });
 
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("STUDENT_REQUIRED");
