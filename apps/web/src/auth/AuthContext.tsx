@@ -13,6 +13,7 @@ export type AuthUser = {
   email: string;
   role: "student" | "moderator";
   course: { id: number; name: string } | null;
+  isBlocked?: boolean;
 };
 
 type AuthStatus = "loading" | "anonymous" | "authenticated";

@@ -14,6 +14,7 @@ function userSelection() {
     role: users.role,
     courseId: users.courseId,
     active: users.active,
+    blocked: users.blocked,
     createdAt: users.createdAt,
     updatedAt: users.updatedAt,
     courseName: courses.name,
@@ -43,6 +44,7 @@ export function createUsersRepository(db: Database) {
         ? null
         : { id: row.courseId, name: row.courseName },
       active: row.active,
+      blocked: row.blocked,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -101,7 +103,7 @@ export function createUsersRepository(db: Database) {
 }
 
 export type UsersRepository = ReturnType<typeof createUsersRepository>;
-export type UserRecord = NonNullable<Awaited<ReturnType<UsersRepository["findUserById"]>>>;
+export type UserRecord = Omit<NonNullable<Awaited<ReturnType<UsersRepository["findUserById"]>>>, "blocked"> & { blocked?: boolean };
 
 export function publicUser(user: UserRecord) {
   return {
@@ -110,5 +112,6 @@ export function publicUser(user: UserRecord) {
     email: user.email,
     role: user.role,
     course: user.course,
+    isBlocked: user.blocked ?? false,
   };
 }

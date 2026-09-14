@@ -13,6 +13,7 @@ const professorRatings = (rating: number) => ({
 const professorReviewContract = (rating: number) => ({
   disciplineId: null,
   targetType: "professor" as const,
+  status: "published" as const,
   ratings: professorRatings(rating),
 });
 const disciplineRatings = { difficulty: 3, relevance: 5, workload: 4 };
@@ -167,11 +168,11 @@ it("aggregates discipline reviews while preserving disciplines without reviews",
   });
 
   const result = await disciplinesRepository.listDisciplines();
-  expect(result[0]).toMatchObject({ reviewCount: 2, averageRating: 4.5 });
+  expect(result[0]).toMatchObject({ reviewCount: 0, averageRating: null });
   expect(result[1]).toMatchObject({ reviewCount: 0, averageRating: null });
   await expect(disciplinesRepository.findDisciplineById(1)).resolves.toMatchObject({
-    reviewCount: 2,
-    averageRating: 4.5,
+    reviewCount: 0,
+    averageRating: null,
   });
 });
 
@@ -390,8 +391,8 @@ it("recalculates review aggregates after create, update, and delete", async () =
   });
   const afterCreate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
 
-  expect(afterCreate.reviewCount).toBe(3);
-  expect(afterCreate.averageRating).toBeCloseTo(10 / 3);
+  expect(afterCreate.reviewCount).toBe(2);
+  expect(afterCreate.averageRating).toBe(4.5);
 
   await reviewsRepository.updateReview({
     professorId: 1,
@@ -401,8 +402,8 @@ it("recalculates review aggregates after create, update, and delete", async () =
   });
   const afterUpdate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
 
-  expect(afterUpdate.reviewCount).toBe(3);
-  expect(afterUpdate.averageRating).toBeCloseTo(13 / 3);
+  expect(afterUpdate.reviewCount).toBe(2);
+  expect(afterUpdate.averageRating).toBe(4.5);
 
   await reviewsRepository.deleteReview({ professorId: 1, reviewId: createdReview.id, authorId: 1 });
 
@@ -466,6 +467,7 @@ it("creates a review and returns the persisted columns", async () => {
     professorId: 3,
     rating: 2,
     ...professorReviewContract(2),
+    status: "pending",
     comment: "Avaliação criada no teste.",
     createdAt: expect.any(Date),
     updatedAt: expect.any(Date),
@@ -473,8 +475,7 @@ it("creates a review and returns the persisted columns", async () => {
   });
   expect(Number.isFinite(review.createdAt.getTime())).toBe(true);
   expect(review.updatedAt.getTime()).toBe(review.createdAt.getTime());
-  await expect(reviewsRepository.listReviewsByProfessorId(3, 1))
-    .resolves.toStrictEqual([review]);
+  await expect(reviewsRepository.listReviewsByProfessorId(3, 1)).resolves.toStrictEqual([]);
 });
 
 it("persists exactly 500 comment code points through the repository", async () => {
@@ -526,6 +527,7 @@ it("partially updates a review", async () => {
     professorId: 1,
     rating: 2,
     ...professorReviewContract(2),
+    status: "pending",
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: expect.any(Date),
@@ -533,7 +535,7 @@ it("partially updates a review", async () => {
   });
   expect(review?.updatedAt.getTime()).toBeGreaterThan(reviewFixtureTimestamp.getTime());
   await expect(reviewsRepository.listReviewsByProfessorId(1, 1))
-    .resolves.toContainEqual(review);
+    .resolves.not.toContainEqual(review);
 });
 
 it("does not update a review through another professor", async () => {

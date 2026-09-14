@@ -57,6 +57,13 @@
       "when": 1789215679055,
       "tag": "0007_narrow_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789414824444,
+      "tag": "0008_known_magneto",
+      "breakpoints": true
     }
   ]
 }

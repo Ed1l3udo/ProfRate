@@ -5,9 +5,11 @@ import { useAuth } from "./AuthContext.js";
 export function ProtectedRoute({
   children,
   studentOnly = false,
+  moderatorOnly = false,
 }: {
   children: React.ReactNode;
   studentOnly?: boolean;
+  moderatorOnly?: boolean;
 }) {
   const { status, user } = useAuth();
   const location = useLocation();
@@ -29,6 +31,7 @@ export function ProtectedRoute({
   if (studentOnly && user.role !== "student") {
     return <Navigate to="/account" replace />;
   }
+  if (moderatorOnly && user.role !== "moderator") return <Navigate to="/account" replace />;
 
   return children;
 }

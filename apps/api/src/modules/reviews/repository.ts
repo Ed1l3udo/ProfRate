@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/database.js";
 import { disciplines, professors, reviews } from "../../db/schema.js";
@@ -15,6 +15,7 @@ function reviewSelection() {
     professorId: reviews.professorId,
     disciplineId: reviews.disciplineId,
     rating: reviews.rating,
+    status: reviews.status,
     didactics: reviews.didactics,
     clarity: reviews.clarity,
     punctuality: reviews.punctuality,
@@ -38,6 +39,7 @@ function publicReview(row: ReviewRow, canManage: boolean) {
   const common = {
     id: row.id,
     rating: row.rating,
+    status: row.status,
     comment: row.comment,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -82,7 +84,7 @@ export function createReviewsRepository(db: Database) {
           : sql<boolean>`coalesce(${reviews.authorId} = ${viewerUserId}, false)`,
       })
       .from(reviews)
-      .where(eq(reviews.professorId, professorId))
+      .where(and(eq(reviews.professorId, professorId), eq(reviews.status, "published")))
       .orderBy(asc(reviews.createdAt), asc(reviews.id));
 
     return rows.map(({ canManage, ...review }) => publicReview(review, canManage));
@@ -97,7 +99,7 @@ export function createReviewsRepository(db: Database) {
           : sql<boolean>`coalesce(${reviews.authorId} = ${viewerUserId}, false)`,
       })
       .from(reviews)
-      .where(eq(reviews.disciplineId, disciplineId))
+      .where(and(eq(reviews.disciplineId, disciplineId), eq(reviews.status, "published")))
       .orderBy(asc(reviews.createdAt), asc(reviews.id));
 
     return rows.map(({ canManage, ...review }) => publicReview(review, canManage));
@@ -177,11 +179,13 @@ export function createReviewsRepository(db: Database) {
     const rows = await db.update(reviews).set({
       ...input.ratings,
       comment: input.comment,
+      status: "pending",
       updatedAt: sql`now()`,
     }).where(and(
       eq(reviews.id, input.reviewId),
       eq(reviews.professorId, input.professorId),
       eq(reviews.authorId, input.authorId),
+      ne(reviews.status, "removed"),
     )).returning(reviewSelection());
     const row = rows.at(0);
     return row === undefined ? undefined : publicReview(row, true);
@@ -195,11 +199,13 @@ export function createReviewsRepository(db: Database) {
     const rows = await db.update(reviews).set({
       ...input.ratings,
       comment: input.comment,
+      status: "pending",
       updatedAt: sql`now()`,
     }).where(and(
       eq(reviews.id, input.reviewId),
       eq(reviews.disciplineId, input.disciplineId),
       eq(reviews.authorId, input.authorId),
+      ne(reviews.status, "removed"),
     )).returning(reviewSelection());
     const row = rows.at(0);
     return row === undefined ? undefined : publicReview(row, true);

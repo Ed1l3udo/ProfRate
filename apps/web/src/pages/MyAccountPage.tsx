@@ -64,6 +64,7 @@ export function MyAccountPage() {
   return (
     <main className="page-shell auth-page">
       <h1>Minha conta</h1>
+      {user.isBlocked ? <p className="form-feedback" role="alert">Sua conta está bloqueada para criar, editar, excluir ou denunciar avaliações. Você ainda pode consultar seus dados e o catálogo.</p> : null}
       <dl className="account-summary">
         <div><dt>E-mail</dt><dd>{user.email}</dd></div>
         <div><dt>Perfil</dt><dd>{user.role === "student" ? "Aluno" : "Moderador"}</dd></div>

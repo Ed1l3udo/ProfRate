@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { useAuth } from "../auth/AuthContext.js";
+import { ReportReview } from "./ReportReview.js";
 import {
   reviewApiPath,
   reviewTargetConfig,
@@ -34,7 +35,7 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
   onDeleted: (reviewId: number) => void;
   onUpdated: (review: Review) => void;
 }) {
-  const { apiFetch } = useAuth();
+  const { apiFetch, user } = useAuth();
   const target = reviewTargetFrom(review);
   const config = reviewTargetConfig[review.targetType];
   const [isConfirming, setIsConfirming] = useState(false);
@@ -156,6 +157,7 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
       ? "review-character-count review-character-count-attention"
       : "review-character-count";
   const ratingValues = review.ratings as unknown as Record<CriterionKey, number>;
+  const canModify = review.canManage && !user?.isBlocked;
 
   return (
     <li className="review-card">
@@ -194,6 +196,7 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
         </form>
       ) : (
         <>
+          {review.status !== undefined ? <p className={`review-status review-status-${review.status}`}>{review.status === "pending" ? "Pendente" : review.status === "published" ? "Publicada" : "Removida"}</p> : null}
           <p className="review-rating">Média geral: {ratingFormatter.format(review.rating)}/5</p>
           <dl className="review-rating-breakdown">
             {config.criteria.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{ratingValues[key]}/5</dd></div>)}
@@ -205,13 +208,13 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
           ) : null}
         </>
       )}
-      {review.canManage && !isEditing && !isConfirming ? (
+      {canModify && review.status !== "removed" && !isEditing && !isConfirming ? (
         <div className="review-actions">
           <button className="review-edit" type="button" onClick={beginEditing}>Editar avaliação</button>
           <button className="review-delete" type="button" onClick={() => { setIsEditing(false); setEditFeedback(null); setDeleteHasError(false); setIsConfirming(true); }}>Excluir avaliação</button>
         </div>
       ) : null}
-      {review.canManage && !isEditing && isConfirming ? (
+      {canModify && !isEditing && isConfirming ? (
         <div className="review-delete-confirmation">
           <p>Deseja excluir esta avaliação?</p>
           <button className="review-delete-confirm" type="button" disabled={isDeleting} onClick={() => void handleDelete()}>{isDeleting ? "Excluindo..." : "Confirmar exclusão"}</button>
@@ -223,6 +226,7 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
       {editFeedback === "error" ? <p className="form-feedback" role="alert">Não foi possível editar a avaliação.</p> : null}
       {editFeedback === "success" ? <p className="form-feedback" role="status">Avaliação atualizada com sucesso.</p> : null}
       {deleteHasError ? <p className="form-feedback" role="alert">Não foi possível excluir a avaliação.</p> : null}
+      {!isEditing && !isConfirming ? <ReportReview review={review} /> : null}
     </li>
   );
 }

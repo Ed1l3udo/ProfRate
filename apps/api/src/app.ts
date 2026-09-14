@@ -60,8 +60,13 @@ import {
   updateProfessorReviewBodySchema,
 } from "./modules/reviews/schemas.js";
 import type { ReviewsRepository } from "./modules/reviews/repository.js";
+import type { ReportsRepository } from "./modules/reports/repository.js";
+import { createReportBodySchema, duplicateReportError, invalidReportInputError, ownReviewReportError, reportNotFoundError, reviewNotReportableError } from "./modules/reports/schemas.js";
+import type { ModerationRepository } from "./modules/moderation/repository.js";
+import { invalidModerationInputError, moderationConflictError, moderationIdParamsSchema, moderationReportQuerySchema, moderationReportStatusSchema, moderationReviewStatusSchema, moderationStatusQuerySchema, moderationUserNotFoundError, moderationUserQuerySchema, selfBlockError } from "./modules/moderation/schemas.js";
 import {
   publicUser,
+  type UserRecord,
   type UsersRepository,
 } from "./modules/users/repository.js";
 
@@ -94,6 +99,14 @@ export function createApp({
   findDisciplineReviewOwnership = async () => undefined,
   listReviewsByDisciplineId = async () => [],
   updateDisciplineReview = async () => undefined,
+  findReviewForReport = async () => undefined,
+  createReport = async () => undefined,
+  listReports = async () => [],
+  resolveReport = async () => undefined,
+  listModerationReviews = async () => [],
+  setReviewStatus = async () => undefined,
+  listModerationUsers = async () => [],
+  setBlocked = async () => undefined,
   findDisciplineById = async () => undefined,
   listCourses = async () => [],
   listDepartments = async () => [],
@@ -132,6 +145,14 @@ export function createApp({
   findDisciplineReviewOwnership?: ReviewsRepository["findDisciplineReviewOwnership"];
   listReviewsByDisciplineId?: ReviewsRepository["listReviewsByDisciplineId"];
   updateDisciplineReview?: ReviewsRepository["updateDisciplineReview"];
+  findReviewForReport?: ReportsRepository["findReviewForReport"];
+  createReport?: ReportsRepository["createReport"];
+  listReports?: ReportsRepository["listReports"];
+  resolveReport?: ReportsRepository["resolveReport"];
+  listModerationReviews?: ModerationRepository["listReviews"];
+  setReviewStatus?: ModerationRepository["setReviewStatus"];
+  listModerationUsers?: ModerationRepository["listUsers"];
+  setBlocked?: ModerationRepository["setBlocked"];
   findDisciplineById?: DisciplinesRepository["findDisciplineById"];
   listCourses?: CoursesRepository["listCourses"];
   listDepartments?: DepartmentsRepository["listDepartments"];
@@ -140,7 +161,7 @@ export function createApp({
   findCourseById?: CoursesRepository["findCourseById"];
   findReviewOwnership?: ReviewsRepository["findReviewOwnership"];
   findUserByEmail?: UsersRepository["findUserByEmail"];
-  findUserById?: UsersRepository["findUserById"];
+  findUserById?: (id: number) => Promise<UserRecord | undefined>;
   hashPassword?: PasswordService["hashPassword"];
   listReviewsByAuthorId?: ReviewsRepository["listReviewsByAuthorId"];
   signToken?: TokenService["signToken"];
@@ -153,6 +174,8 @@ export function createApp({
     optionalAuthentication,
     requireAuthentication,
     requireStudent,
+    requireModerator,
+    requireUnblocked,
   } = createAuthenticationMiddleware({ findUserById, verifyToken });
 
   app.use(express.json());
@@ -324,6 +347,7 @@ export function createApp({
     "/disciplines/:id/reviews",
     requireAuthentication,
     requireStudent,
+    requireUnblocked,
     async (request, response) => {
       const parsedParams = disciplineIdParamsSchema.safeParse(request.params);
       if (!parsedParams.success) {
@@ -354,6 +378,7 @@ export function createApp({
     "/disciplines/:disciplineId/reviews/:reviewId",
     requireAuthentication,
     requireStudent,
+    requireUnblocked,
     async (request, response) => {
       const parsedDisciplineId = disciplineIdParamsSchema.safeParse({ id: request.params.disciplineId });
       const parsedReviewId = reviewIdParamsSchema.safeParse({ reviewId: request.params.reviewId });
@@ -403,6 +428,7 @@ export function createApp({
     "/disciplines/:disciplineId/reviews/:reviewId",
     requireAuthentication,
     requireStudent,
+    requireUnblocked,
     async (request, response) => {
       const parsedDisciplineId = disciplineIdParamsSchema.safeParse({ id: request.params.disciplineId });
       const parsedReviewId = reviewIdParamsSchema.safeParse({ reviewId: request.params.reviewId });
@@ -511,6 +537,7 @@ export function createApp({
     "/professors/:id/reviews",
     requireAuthentication,
     requireStudent,
+    requireUnblocked,
     async (request, response) => {
     const parsedParams = professorIdParamsSchema.safeParse(request.params);
 
@@ -551,6 +578,7 @@ export function createApp({
     "/professors/:professorId/reviews/:reviewId",
     requireAuthentication,
     requireStudent,
+    requireUnblocked,
     async (request, response) => {
       const parsedProfessorId = professorIdParamsSchema.safeParse({
         id: request.params.professorId,
@@ -614,6 +642,7 @@ export function createApp({
     "/professors/:professorId/reviews/:reviewId",
     requireAuthentication,
     requireStudent,
+    requireUnblocked,
     async (request, response) => {
       const parsedProfessorId = professorIdParamsSchema.safeParse({
         id: request.params.professorId,
@@ -671,6 +700,61 @@ export function createApp({
       return response.status(200).json(updatedReview);
     },
   );
+
+  app.post("/reviews/:reviewId/reports", requireAuthentication, requireStudent, requireUnblocked, async (request, response) => {
+    const params = moderationIdParamsSchema.safeParse({ id: request.params.reviewId });
+    const body = createReportBodySchema.safeParse(request.body);
+    if (!params.success || !body.success) return response.status(400).json({ error: invalidReportInputError });
+    const review = await findReviewForReport(params.data.id);
+    if (review === undefined || review.status !== "published") return response.status(404).json({ error: reviewNotReportableError });
+    const user = authenticatedUser(response);
+    if (review.authorId === user.id) return response.status(403).json({ error: ownReviewReportError });
+    const report = await createReport({ reviewId: review.id, reporterId: user.id, reason: body.data.reason });
+    return report === undefined ? response.status(409).json({ error: duplicateReportError }) : response.status(201).json(report);
+  });
+
+  app.get("/moderation/reviews", requireAuthentication, requireModerator, async (request, response) => {
+    const query = moderationStatusQuerySchema.safeParse(request.query);
+    if (!query.success) return response.status(400).json({ error: invalidModerationInputError });
+    return response.status(200).json(await listModerationReviews(query.data.status));
+  });
+  app.patch("/moderation/reviews/:reviewId", requireAuthentication, requireModerator, async (request, response) => {
+    const params = moderationIdParamsSchema.safeParse({ id: request.params.reviewId });
+    const body = moderationReviewStatusSchema.safeParse(request.body);
+    if (!params.success || !body.success) return response.status(400).json({ error: invalidModerationInputError });
+    const result = await setReviewStatus({ id: params.data.id, status: body.data.status });
+    if (result === undefined) return response.status(404).json({ error: reviewNotFoundError });
+    if (result === "conflict") return response.status(409).json({ error: moderationConflictError });
+    return response.status(200).json(result);
+  });
+  app.get("/moderation/reports", requireAuthentication, requireModerator, async (request, response) => {
+    const query = moderationReportQuerySchema.safeParse(request.query);
+    if (!query.success) return response.status(400).json({ error: invalidModerationInputError });
+    return response.status(200).json(await listReports(query.data.status));
+  });
+  app.patch("/moderation/reports/:reportId", requireAuthentication, requireModerator, async (request, response) => {
+    const params = moderationIdParamsSchema.safeParse({ id: request.params.reportId });
+    const body = moderationReportStatusSchema.safeParse(request.body);
+    if (!params.success || !body.success) return response.status(400).json({ error: invalidModerationInputError });
+    const result = await resolveReport({ id: params.data.id, status: body.data.status, moderatorId: authenticatedUser(response).id });
+    if (result === undefined) return response.status(404).json({ error: reportNotFoundError });
+    if (result === "conflict") return response.status(409).json({ error: moderationConflictError });
+    return response.status(200).json(result);
+  });
+  app.get("/moderation/users", requireAuthentication, requireModerator, async (request, response) => {
+    const query = moderationUserQuerySchema.safeParse(request.query);
+    if (!query.success) return response.status(400).json({ error: invalidModerationInputError });
+    return response.status(200).json(await listModerationUsers(query.data.search));
+  });
+  for (const [path, blocked] of [["/moderation/users/:userId/block", true], ["/moderation/users/:userId/unblock", false]] as const) {
+    app.patch(path, requireAuthentication, requireModerator, async (request, response) => {
+      const params = moderationIdParamsSchema.safeParse({ id: request.params.userId });
+      if (!params.success) return response.status(400).json({ error: invalidModerationInputError });
+      if (blocked && params.data.id === authenticatedUser(response).id) return response.status(409).json({ error: selfBlockError });
+      const user = await setBlocked({ id: params.data.id, blocked });
+      return user === undefined ? response.status(404).json({ error: moderationUserNotFoundError }) : response.status(200).json(user);
+    });
+  }
 
   app.use(
     (

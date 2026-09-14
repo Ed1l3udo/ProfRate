@@ -7,6 +7,8 @@ import { createDepartmentsRepository } from "./modules/departments/repository.js
 import { createDisciplinesRepository } from "./modules/disciplines/repository.js";
 import { createProfessorsRepository } from "./modules/professors/repository.js";
 import { createReviewsRepository } from "./modules/reviews/repository.js";
+import { createReportsRepository } from "./modules/reports/repository.js";
+import { createModerationRepository } from "./modules/moderation/repository.js";
 import { createUsersRepository } from "./modules/users/repository.js";
 
 const port = Number(process.env.PORT ?? 3000);
@@ -18,6 +20,8 @@ if (!authJwtSecret) {
 
 const professorsRepository = createProfessorsRepository(db);
 const reviewsRepository = createReviewsRepository(db);
+const reportsRepository = createReportsRepository(db);
+const moderationRepository = createModerationRepository(db);
 const departmentsRepository = createDepartmentsRepository(db);
 const coursesRepository = createCoursesRepository(db);
 const disciplinesRepository = createDisciplinesRepository(db);
@@ -27,6 +31,10 @@ const tokenService = createTokenService(authJwtSecret);
 const app = createApp({
   ...professorsRepository,
   ...reviewsRepository,
+  ...reportsRepository,
+  ...moderationRepository,
+  listModerationReviews: moderationRepository.listReviews,
+  listModerationUsers: moderationRepository.listUsers,
   ...departmentsRepository,
   ...coursesRepository,
   ...disciplinesRepository,

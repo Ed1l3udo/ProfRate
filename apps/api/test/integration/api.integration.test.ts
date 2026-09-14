@@ -23,6 +23,8 @@ function createIntegrationApp() {
     passwordService,
     professorsRepository,
     reviewsRepository,
+    reportsRepository,
+    moderationRepository,
     tokenService,
     usersRepository,
   } = getIntegrationContext();
@@ -34,6 +36,10 @@ function createIntegrationApp() {
     ...passwordService,
     ...professorsRepository,
     ...reviewsRepository,
+    ...reportsRepository,
+    ...moderationRepository,
+    listModerationReviews: moderationRepository.listReviews,
+    listModerationUsers: moderationRepository.listUsers,
     ...tokenService,
     ...usersRepository,
   });
@@ -95,6 +101,7 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     createdAt: expect.stringMatching(isoUtcTimestamp),
     updatedAt: expect.stringMatching(isoUtcTimestamp),
     canManage: true,
+    status: "pending",
   });
   expect(createResponse.body.updatedAt).toBe(createResponse.body.createdAt);
 
@@ -103,7 +110,7 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     .set("Authorization", authorization);
 
   expect(afterCreateResponse.status).toBe(200);
-  expect(afterCreateResponse.body).toContainEqual(createResponse.body);
+  expect(afterCreateResponse.body).not.toContainEqual(createResponse.body);
 
   const updateResponse = await request(app)
     .patch(`/professors/1/reviews/${createResponse.body.id}`)
@@ -122,6 +129,7 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     createdAt: createResponse.body.createdAt,
     updatedAt: expect.stringMatching(isoUtcTimestamp),
     canManage: true,
+    status: "pending",
   });
 
   const afterUpdateResponse = await request(app)
@@ -129,8 +137,7 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     .set("Authorization", authorization);
 
   expect(afterUpdateResponse.status).toBe(200);
-  expect(afterUpdateResponse.body).toContainEqual(updateResponse.body);
-  expect(afterUpdateResponse.body).not.toContainEqual(createResponse.body);
+  expect(afterUpdateResponse.body).not.toContainEqual(updateResponse.body);
 
   const deleteResponse = await request(app).delete(
     `/professors/1/reviews/${createResponse.body.id}`,
@@ -165,7 +172,7 @@ it("preserves creation and advances the fixed fixture timestamp on PATCH", async
     .get("/professors/1/reviews")
     .set("Authorization", authorization);
   expect(listResponse.status).toBe(200);
-  expect(listResponse.body).toContainEqual(response.body);
+  expect(listResponse.body).not.toContainEqual(response.body);
 });
 
 it("enforces the 500-code-point comment limit through POST and PATCH", async () => {
@@ -285,7 +292,7 @@ it("enforces review ownership and preserves public legacy reviews", async () => 
   const reviewId = createResponse.body.id as number;
 
   const publicResponse = await request(app).get("/professors/1/reviews");
-  const publicReview = publicResponse.body.find((review: { id: number }) => review.id === reviewId);
+  const publicReview = publicResponse.body.find((review: { id: number }) => review.id === 1);
   expect(publicReview.canManage).toBe(false);
   expect(JSON.stringify(publicReview)).not.toContain("authorId");
 
@@ -327,7 +334,7 @@ it("enforces review ownership and preserves public legacy reviews", async () => 
   });
   const legacyResponse = await request(app).get("/professors/1/reviews");
   expect(legacyResponse.body).toContainEqual(
-    expect.objectContaining({ comment: "Review legada sem autor.", canManage: false }),
+    expect.objectContaining({ comment: "Primeira avaliação de teste.", canManage: false, status: "published" }),
   );
 
   await database.db.delete(users).where(eq(users.id, 1));

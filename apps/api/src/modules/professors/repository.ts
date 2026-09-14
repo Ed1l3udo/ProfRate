@@ -16,7 +16,7 @@ export function createProfessorsRepository(db: Database) {
       })
       .from(professors)
       .innerJoin(departments, eq(departments.id, professors.departmentId))
-      .leftJoin(reviews, eq(reviews.professorId, professors.id))
+      .leftJoin(reviews, and(eq(reviews.professorId, professors.id), eq(reviews.status, "published")))
       .where(
         and(
           filters.search === undefined

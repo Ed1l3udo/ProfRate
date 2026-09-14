@@ -80,6 +80,7 @@ describe("authentication API", () => {
         name: "Ana Exemplo",
         email: "ana@student.profrate.test",
         role: "student",
+        isBlocked: false,
         course: { id: 1, name: "Computação Aplicada" },
       },
       token: "signed-token",

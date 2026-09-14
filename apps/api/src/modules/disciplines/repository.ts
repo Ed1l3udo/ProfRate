@@ -53,7 +53,7 @@ export function createDisciplinesRepository(db: Database) {
       })
       .from(disciplines)
       .innerJoin(departments, eq(departments.id, disciplines.departmentId))
-      .leftJoin(reviews, eq(reviews.disciplineId, disciplines.id))
+      .leftJoin(reviews, and(eq(reviews.disciplineId, disciplines.id), eq(reviews.status, "published")))
       .where(
         and(
           filters.search === undefined
@@ -118,11 +118,11 @@ export function createDisciplinesRepository(db: Database) {
         departmentName: departments.name,
         reviewCount: sql<number>`(
           select count(*)::integer from ${reviews}
-          where ${reviews.disciplineId} = ${disciplines.id}
+          where ${reviews.disciplineId} = ${disciplines.id} and ${reviews.status} = 'published'
         )`,
         averageRating: sql<number | null>`(
           select avg(${reviews.rating})::double precision from ${reviews}
-          where ${reviews.disciplineId} = ${disciplines.id}
+          where ${reviews.disciplineId} = ${disciplines.id} and ${reviews.status} = 'published'
         )`,
       })
       .from(disciplines)

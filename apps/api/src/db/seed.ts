@@ -9,6 +9,7 @@ import {
   disciplines,
   professorDisciplines,
   professors,
+  reports,
   reviews,
   users,
 } from "./schema.js";
@@ -78,12 +79,12 @@ const seedProfessorDisciplines = [
 ];
 
 const seedReviews = [
-  { targetType: "professor" as const, professorName: "Ada Ribeiro", ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 }, comment: "Explicações claras e atividades bem organizadas." },
-  { targetType: "professor" as const, professorName: "Ada Ribeiro", ratings: { didactics: 4, clarity: 4, punctuality: 4, availability: 4 }, comment: "Feedbacks úteis durante os exercícios." },
-  { targetType: "professor" as const, professorName: "Caio Nogueira", ratings: { didactics: 4, clarity: 4, punctuality: 4, availability: 4 }, comment: "Aulas objetivas e exemplos práticos." },
-  { targetType: "discipline" as const, disciplineCode: "CMP101", ratings: { difficulty: 3, relevance: 5, workload: 4 }, comment: "Conteúdo introdutório bem distribuído ao longo das atividades." },
-  { targetType: "discipline" as const, disciplineCode: "CMP101", ratings: { difficulty: 4, relevance: 4, workload: 3 }, comment: "Exercícios fictícios ajudam a consolidar os fundamentos." },
-  { targetType: "discipline" as const, disciplineCode: "CDD101", ratings: { difficulty: 4, relevance: 5, workload: 4 }, comment: "Base matemática relevante para os módulos seguintes." },
+  { targetType: "professor" as const, professorName: "Ada Ribeiro", ratings: { didactics: 5, clarity: 5, punctuality: 5, availability: 5 }, status: "published" as const, comment: "Explicações claras e atividades bem organizadas." },
+  { targetType: "professor" as const, professorName: "Ada Ribeiro", ratings: { didactics: 4, clarity: 4, punctuality: 4, availability: 4 }, status: "published" as const, comment: "Feedbacks úteis durante os exercícios." },
+  { targetType: "professor" as const, professorName: "Caio Nogueira", ratings: { didactics: 4, clarity: 4, punctuality: 4, availability: 4 }, status: "published" as const, comment: "Aulas objetivas e exemplos práticos." },
+  { targetType: "discipline" as const, disciplineCode: "CMP101", ratings: { difficulty: 3, relevance: 5, workload: 4 }, status: "published" as const, comment: "Conteúdo introdutório bem distribuído ao longo das atividades." },
+  { targetType: "discipline" as const, disciplineCode: "CMP101", ratings: { difficulty: 4, relevance: 4, workload: 3 }, status: "published" as const, comment: "Exercícios fictícios ajudam a consolidar os fundamentos." },
+  { targetType: "discipline" as const, disciplineCode: "CDD101", ratings: { difficulty: 4, relevance: 5, workload: 4 }, status: "published" as const, comment: "Base matemática relevante para os módulos seguintes." },
 ];
 
 const seedUsers = [
@@ -230,10 +231,53 @@ try {
 
       if (!existingReviewKeys.has(reviewKey)) {
         await transaction.insert(reviews).values(review.targetType === "professor"
-          ? { professorId: targetId, ...review.ratings, comment: review.comment }
-          : { disciplineId: targetId, ...review.ratings, comment: review.comment });
+          ? { professorId: targetId, ...review.ratings, status: review.status, comment: review.comment }
+          : { disciplineId: targetId, ...review.ratings, status: review.status, comment: review.comment });
         existingReviewKeys.add(reviewKey);
       }
+    }
+
+    const [seedStudent] = await transaction
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, "ana@student.profrate.test"))
+      .limit(1);
+    const adaProfessorId = requiredId(professorIds, "Ada Ribeiro", "professor");
+    const pendingComment = "Avaliação fictícia aguardando moderação.";
+    const pendingReview = await transaction
+      .select({ id: reviews.id })
+      .from(reviews)
+      .where(and(eq(reviews.authorId, seedStudent!.id), eq(reviews.comment, pendingComment)))
+      .limit(1);
+    if (pendingReview.length === 0) {
+      await transaction.insert(reviews).values({
+        professorId: adaProfessorId,
+        authorId: seedStudent!.id,
+        didactics: 4,
+        clarity: 4,
+        punctuality: 5,
+        availability: 4,
+        status: "pending",
+        comment: pendingComment,
+      });
+    }
+
+    const [publishedReview] = await transaction
+      .select({ id: reviews.id })
+      .from(reviews)
+      .where(eq(reviews.comment, "Explicações claras e atividades bem organizadas."))
+      .limit(1);
+    const existingReport = await transaction
+      .select({ id: reports.id })
+      .from(reports)
+      .where(and(eq(reports.reviewId, publishedReview!.id), eq(reports.reporterId, seedStudent!.id)))
+      .limit(1);
+    if (existingReport.length === 0) {
+      await transaction.insert(reports).values({
+        reviewId: publishedReview!.id,
+        reporterId: seedStudent!.id,
+        reason: "Denúncia fictícia pendente para demonstração local.",
+      });
     }
   });
 

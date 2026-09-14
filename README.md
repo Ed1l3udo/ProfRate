@@ -15,6 +15,7 @@ O projeto exercita, em fatias pequenas, a integração entre persistência relac
 - listagem de avaliações fictícias;
 - cadastro e login local de alunos com sessão JWT;
 - autoria, criação, edição e exclusão das próprias avaliações fictícias;
+- ciclo de publicação de avaliações, denúncias e moderação por uma conta fictícia dedicada;
 - área de conta e listagem das avaliações do aluno;
 - validação de parâmetros e corpos de requisição com respostas de erro previsíveis;
 - persistência em PostgreSQL por migrations e seed repetível;
@@ -118,7 +119,7 @@ Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker comp
 ## Banco de dados
 
 - `db:migrate` aplica as migrations SQL geradas pelo Drizzle.
-- `db:seed` insere o catálogo fictício com 3 departamentos, 3 cursos, 10 professores, 15 disciplinas, três avaliações de professor e três avaliações de disciplina, sem duplicar os dados controlados quando executado novamente.
+- `db:seed` insere o catálogo fictício com 3 departamentos, 3 cursos, 10 professores, 15 disciplinas, três avaliações de professor e três avaliações de disciplina já publicadas, uma avaliação pendente e uma denúncia pendente, sem duplicar os dados controlados nem trocar hashes quando executado novamente.
 - `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
 - `db:generate` gera uma nova migration depois de uma alteração aprovada no schema Drizzle.
 
@@ -159,8 +160,16 @@ pnpm --filter @profrate/api db:generate
 | POST | `/disciplines/:id/reviews` | Aluno autenticado cria uma avaliação e recebe `201` |
 | PATCH | `/disciplines/:disciplineId/reviews/:reviewId` | Autor autenticado atualiza sua avaliação |
 | DELETE | `/disciplines/:disciplineId/reviews/:reviewId` | Autor autenticado exclui sua avaliação e recebe `204` |
+| POST | `/reviews/:reviewId/reports` | Aluno autenticado e desbloqueado denuncia uma avaliação publicada de outra pessoa |
+| GET | `/moderation/reviews` | Moderador lista avaliações por status (padrão: `pending`) |
+| PATCH | `/moderation/reviews/:reviewId` | Moderador publica ou remove uma avaliação |
+| GET | `/moderation/reports` | Moderador lista denúncias por status (padrão: `pending`) com contexto da avaliação |
+| PATCH | `/moderation/reports/:reportId` | Moderador resolve ou descarta uma denúncia |
+| GET | `/moderation/users` | Moderador busca usuários por nome ou e-mail |
+| PATCH | `/moderation/users/:userId/block` | Moderador bloqueia um usuário, exceto a própria conta |
+| PATCH | `/moderation/users/:userId/unblock` | Moderador desbloqueia um usuário |
 
-As rotas públicas de catálogo continuam sem exigir sessão. Escritas de avaliações usam `Authorization: Bearer <token>`, aceitam um objeto `ratings` completo — quatro critérios para professor ou três para disciplina — e `comment` não vazio. A média decimal `rating` é derivada pelo PostgreSQL e não é aceita no corpo da requisição; o autor vem exclusivamente do token. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
+As rotas públicas de catálogo continuam sem exigir sessão e só exibem avaliações `published`; pendentes e removidas não influenciam médias nem contagens. Escritas de avaliações e denúncias usam `Authorization: Bearer <token>`, aceitam um objeto `ratings` completo — quatro critérios para professor ou três para disciplina — e `comment` ou motivo não vazio. A média decimal `rating` é derivada pelo PostgreSQL e não é aceita no corpo da requisição; o autor vem exclusivamente do token. Usuários bloqueados continuam lendo os dados, mas não podem criar, editar, excluir ou denunciar avaliações. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
 
 Senhas são validadas na borda, armazenadas com bcrypt (custo 12) e nunca registradas ou devolvidas. O JWT é criado e verificado pelo `jose`; a API valida assinatura, expiração, formato do payload, existência, estado e papel atual do usuário antes de autorizar uma operação.
 

@@ -11,6 +11,7 @@ import { MyReviewsPage } from "./pages/MyReviewsPage.js";
 import { ProfessorDetailsPage } from "./pages/ProfessorDetailsPage.js";
 import { ProfessorsListPage } from "./pages/ProfessorsListPage.js";
 import { SignupPage } from "./pages/SignupPage.js";
+import { ModerationPage } from "./pages/ModerationPage.js";
 
 export function App() {
   return (
@@ -29,6 +30,7 @@ export function App() {
         <Route path="/my-reviews" element={(
           <ProtectedRoute studentOnly><MyReviewsPage /></ProtectedRoute>
         )} />
+        <Route path="/moderation" element={<ProtectedRoute moderatorOnly><ModerationPage /></ProtectedRoute>} />
       </Routes>
     </AuthProvider>
   );

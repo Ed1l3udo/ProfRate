@@ -18,6 +18,7 @@ type ReviewBase = {
   createdAt: string;
   updatedAt: string;
   canManage: boolean;
+  status?: "pending" | "published" | "removed";
 };
 
 export type ProfessorReview = ReviewBase & {

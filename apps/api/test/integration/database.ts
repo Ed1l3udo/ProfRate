@@ -23,6 +23,8 @@ import { createDepartmentsRepository } from "../../src/modules/departments/repos
 import { createDisciplinesRepository } from "../../src/modules/disciplines/repository.js";
 import { createProfessorsRepository } from "../../src/modules/professors/repository.js";
 import { createReviewsRepository } from "../../src/modules/reviews/repository.js";
+import { createReportsRepository } from "../../src/modules/reports/repository.js";
+import { createModerationRepository } from "../../src/modules/moderation/repository.js";
 import { createUsersRepository } from "../../src/modules/users/repository.js";
 
 const integrationDatabaseName = "profrate_test";
@@ -145,6 +147,8 @@ type IntegrationContext = {
   database: IntegrationDatabase;
   professorsRepository: ReturnType<typeof createProfessorsRepository>;
   reviewsRepository: ReturnType<typeof createReviewsRepository>;
+  reportsRepository: ReturnType<typeof createReportsRepository>;
+  moderationRepository: ReturnType<typeof createModerationRepository>;
   departmentsRepository: ReturnType<typeof createDepartmentsRepository>;
   coursesRepository: ReturnType<typeof createCoursesRepository>;
   disciplinesRepository: ReturnType<typeof createDisciplinesRepository>;
@@ -175,6 +179,8 @@ export async function initializeIntegrationDatabase(): Promise<void> {
       database,
       professorsRepository: createProfessorsRepository(database.db),
       reviewsRepository: createReviewsRepository(database.db),
+      reportsRepository: createReportsRepository(database.db),
+      moderationRepository: createModerationRepository(database.db),
       departmentsRepository: createDepartmentsRepository(database.db),
       coursesRepository: createCoursesRepository(database.db),
       disciplinesRepository: createDisciplinesRepository(database.db),
@@ -283,6 +289,7 @@ export async function resetIntegrationDatabase(): Promise<void> {
       clarity: 5,
       punctuality: 5,
       availability: 5,
+      status: "published",
       comment: "Primeira avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
       updatedAt: reviewFixtureTimestamp,
@@ -294,6 +301,7 @@ export async function resetIntegrationDatabase(): Promise<void> {
       clarity: 4,
       punctuality: 4,
       availability: 4,
+      status: "published",
       comment: "Segunda avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
       updatedAt: reviewFixtureTimestamp,
@@ -305,6 +313,7 @@ export async function resetIntegrationDatabase(): Promise<void> {
       clarity: 3,
       punctuality: 3,
       availability: 3,
+      status: "published",
       comment: "Terceira avaliação de teste.",
       createdAt: reviewFixtureTimestamp,
       updatedAt: reviewFixtureTimestamp,

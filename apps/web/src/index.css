@@ -384,6 +384,10 @@ h3 {
   color: #176b87;
   font-weight: 700;
 }
+.review-status { margin: 0 0 0.5rem; font-weight: 700; }
+.review-status-pending { color: #8a5a00; }
+.review-status-published { color: #176b87; }
+.review-status-removed { color: #a12622; }
 
 .review-comment {
   margin: 0.35rem 0 0;
@@ -401,6 +405,65 @@ h3 {
   gap: 0.5rem;
   align-items: center;
   margin-top: 0.85rem;
+}
+
+.review-report {
+  margin-top: 0.85rem;
+}
+
+.review-report-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.review-report-actions,
+.review-report-confirmation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.review-report-confirmation p {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: 700;
+}
+
+.review-report-open,
+.review-report-submit,
+.review-report-cancel {
+  border: 1px solid #176b87;
+  border-radius: 0.45rem;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.review-report-open,
+.review-report-submit {
+  background: #176b87;
+  color: #ffffff;
+}
+
+.review-report-cancel {
+  background: #ffffff;
+  color: #176b87;
+}
+
+.review-report-open:hover,
+.review-report-submit:hover:not(:disabled) {
+  background: #0e4f65;
+}
+
+.review-report-cancel:hover:not(:disabled) {
+  background: #eef6f8;
+}
+
+.review-report-submit:disabled,
+.review-report-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .review-actions,
@@ -671,6 +734,130 @@ h3 {
   font-weight: 700;
 }
 
+.moderation-page {
+  width: min(100% - 2rem, 62rem);
+}
+
+.moderation-tabs {
+  display: flex;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid #d9e3ec;
+  overflow-x: auto;
+}
+
+.moderation-tabs button,
+.moderation-actions button,
+.moderation-search button,
+.moderation-error button,
+.moderation-user > button {
+  border: 1px solid #176b87;
+  border-radius: 0.45rem;
+  background: #176b87;
+  padding: 0.55rem 0.75rem;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.moderation-tabs button {
+  flex: 0 0 auto;
+  border-radius: 0.45rem 0.45rem 0 0;
+  background: #ffffff;
+  color: #176b87;
+}
+
+.moderation-tabs button[aria-selected="true"] {
+  background: #176b87;
+  color: #ffffff;
+}
+
+.moderation-section {
+  padding: 1.25rem;
+  border: 1px solid #d9e3ec;
+  border-radius: 0.75rem;
+  background: #ffffff;
+}
+
+.moderation-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.moderation-card {
+  padding: 1rem;
+  border: 1px solid #d9e3ec;
+  border-radius: 0.6rem;
+  background: #f9fbfd;
+}
+
+.moderation-card p {
+  margin: 0.45rem 0;
+}
+
+.moderation-card-heading,
+.moderation-user {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.moderation-meta {
+  color: #617286;
+  font-size: 0.9rem;
+}
+
+.moderation-criteria {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.5rem;
+  margin: 0.8rem 0;
+}
+
+.moderation-criteria div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.moderation-criteria dt { color: #617286; }
+.moderation-criteria dd { margin: 0; font-weight: 700; }
+
+.moderation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.moderation-actions button:disabled,
+.moderation-user > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.danger-button { border-color: #a12622 !important; background: #a12622 !important; }
+.danger-button:hover:not(:disabled) { background: #7d1c19 !important; }
+
+.moderation-error {
+  padding: 1rem;
+  border: 1px solid #f0b4b0;
+  border-radius: 0.6rem;
+  color: #7d1c19;
+  background: #fff6f5;
+}
+
+.moderation-search {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.moderation-search label { font-weight: 700; }
+.moderation-search div { display: flex; gap: 0.5rem; }
+.moderation-search input { flex: 1; min-width: 0; border: 1px solid #aebdca; border-radius: 0.45rem; padding: 0.55rem 0.7rem; }
+
 @media (max-width: 38rem) {
   .main-navigation {
     align-items: stretch;
@@ -697,4 +884,9 @@ h3 {
   .discipline-metadata {
     grid-template-columns: 1fr;
   }
+
+  .moderation-section { padding: 1rem; }
+  .moderation-card-heading,
+  .moderation-user { flex-direction: column; }
+  .moderation-search div { flex-direction: column; }
 }

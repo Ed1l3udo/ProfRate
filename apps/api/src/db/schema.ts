@@ -14,6 +14,8 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const userRole = pgEnum("user_role", ["student", "moderator"]);
+export const reviewStatus = pgEnum("review_status", ["pending", "published", "removed"]);
+export const reportStatus = pgEnum("report_status", ["pending", "resolved", "dismissed"]);
 
 export const departments = pgTable("departments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -109,6 +111,7 @@ export const users = pgTable(
     role: userRole("role").notNull(),
     courseId: integer("course_id").references(() => courses.id),
     active: boolean("active").notNull().default(true),
+    blocked: boolean("blocked").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -154,6 +157,7 @@ export const reviews = pgTable(
         else
           ("difficulty" + "relevance" + "workload") / 3.0
       end`),
+    status: reviewStatus("status").notNull().default("pending"),
     comment: text("comment").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
       .notNull()
@@ -206,5 +210,36 @@ export const reviews = pgTable(
     index("reviews_professor_id_idx").on(table.professorId),
     index("reviews_discipline_id_idx").on(table.disciplineId),
     index("reviews_author_id_idx").on(table.authorId),
+    index("reviews_status_idx").on(table.status),
+  ],
+);
+
+export const reports = pgTable(
+  "reports",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    reviewId: integer("review_id")
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    reporterId: integer("reporter_id")
+      .notNull()
+      .references(() => users.id),
+    reason: text("reason").notNull(),
+    status: reportStatus("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "date" }),
+    resolvedBy: integer("resolved_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    uniqueIndex("reports_review_id_reporter_id_unique").on(table.reviewId, table.reporterId),
+    index("reports_status_idx").on(table.status),
+    index("reports_review_id_idx").on(table.reviewId),
+    index("reports_reporter_id_idx").on(table.reporterId),
+    check("reports_reason_not_blank", sql`length(trim(${table.reason})) > 0`),
+    check("reports_reason_max_500", sql`char_length(${table.reason}) <= 500`),
   ],
 );

@@ -126,12 +126,13 @@ export function ReviewsSection({ target }: { target: ReviewTarget }) {
             }} />)}
         </ul>
       ) : null}
-      {loadState === "success" && status === "authenticated" && user?.role === "student" ? (
+      {loadState === "success" && status === "authenticated" && user?.role === "student" && !user.isBlocked ? (
         <ReviewForm target={target} onReviewCreated={(review) => {
           setReviews((current) => [...current, review]);
           setRatingFilter("all");
         }} />
       ) : null}
+      {loadState === "success" && status === "authenticated" && user?.isBlocked ? <p className="review-auth-invite">Sua conta está bloqueada para novas alterações.</p> : null}
       {loadState === "success" && status === "anonymous" ? (
         <p className="review-auth-invite"><Link to="/login" state={{ from: `${location.pathname}${location.search}` }}>Entre</Link>{" para publicar uma avaliação."}</p>
       ) : null}

@@ -1,7 +1,7 @@
 import type { RequestHandler, Response } from "express";
 
 import type { TokenService } from "./token.js";
-import type { UserRecord, UsersRepository } from "../users/repository.js";
+import type { UserRecord } from "../users/repository.js";
 
 export const authenticationRequiredError = {
   code: "AUTHENTICATION_REQUIRED",
@@ -22,6 +22,7 @@ export const studentRequiredError = {
   code: "STUDENT_REQUIRED",
   message: "A student account is required.",
 };
+export const moderatorRequiredError = { code: "MODERATOR_REQUIRED", message: "A moderator account is required." };
 
 export function authenticatedUser(response: Response): UserRecord {
   return response.locals.authUser as UserRecord;
@@ -31,7 +32,7 @@ export function createAuthenticationMiddleware({
   findUserById,
   verifyToken,
 }: {
-  findUserById: UsersRepository["findUserById"];
+  findUserById: (id: number) => Promise<UserRecord | undefined>;
   verifyToken: TokenService["verifyToken"];
 }) {
   function authenticate(required: boolean): RequestHandler {
@@ -82,6 +83,20 @@ export function createAuthenticationMiddleware({
 
     next();
   };
+  const requireModerator: RequestHandler = (_request, response, next) => {
+    if (authenticatedUser(response).role !== "moderator") {
+      response.status(403).json({ error: moderatorRequiredError });
+      return;
+    }
+    next();
+  };
+  const requireUnblocked: RequestHandler = (_request, response, next) => {
+    if (authenticatedUser(response).blocked) {
+      response.status(403).json({ error: userBlockedError });
+      return;
+    }
+    next();
+  };
 
-  return { optionalAuthentication, requireAuthentication, requireStudent };
+  return { optionalAuthentication, requireAuthentication, requireStudent, requireModerator, requireUnblocked };
 }
