@@ -102,6 +102,13 @@ const seedUsers = [
     role: "moderator" as const,
     course: null,
   },
+  {
+    name: "Ari Administração",
+    email: "admin@profrate.test",
+    password: "ProfRate#2026Admin",
+    role: "admin" as const,
+    course: null,
+  },
 ];
 
 function requiredId(map: Map<string, number>, key: string, entity: string) {

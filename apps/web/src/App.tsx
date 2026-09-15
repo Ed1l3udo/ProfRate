@@ -12,6 +12,7 @@ import { ProfessorDetailsPage } from "./pages/ProfessorDetailsPage.js";
 import { ProfessorsListPage } from "./pages/ProfessorsListPage.js";
 import { SignupPage } from "./pages/SignupPage.js";
 import { ModerationPage } from "./pages/ModerationPage.js";
+import { AdminPage } from "./pages/AdminPage.js";
 
 export function App() {
   return (
@@ -31,6 +32,7 @@ export function App() {
           <ProtectedRoute studentOnly><MyReviewsPage /></ProtectedRoute>
         )} />
         <Route path="/moderation" element={<ProtectedRoute moderatorOnly><ModerationPage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
       </Routes>
     </AuthProvider>
   );

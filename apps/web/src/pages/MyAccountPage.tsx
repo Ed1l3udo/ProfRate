@@ -67,7 +67,7 @@ export function MyAccountPage() {
       {user.isBlocked ? <p className="form-feedback" role="alert">Sua conta está bloqueada para criar, editar, excluir ou denunciar avaliações. Você ainda pode consultar seus dados e o catálogo.</p> : null}
       <dl className="account-summary">
         <div><dt>E-mail</dt><dd>{user.email}</dd></div>
-        <div><dt>Perfil</dt><dd>{user.role === "student" ? "Aluno" : "Moderador"}</dd></div>
+        <div><dt>Perfil</dt><dd>{user.role === "student" ? "Aluno" : user.role === "moderator" ? "Moderador" : "Administrador"}</dd></div>
         <div><dt>Curso</dt><dd>{user.course?.name ?? "Não vinculado"}</dd></div>
       </dl>
       <form className="auth-form" onSubmit={handleSubmit}>

@@ -23,6 +23,7 @@ export const studentRequiredError = {
   message: "A student account is required.",
 };
 export const moderatorRequiredError = { code: "MODERATOR_REQUIRED", message: "A moderator account is required." };
+export const adminRequiredError = { code: "ADMIN_REQUIRED", message: "An admin account is required." };
 
 export function authenticatedUser(response: Response): UserRecord {
   return response.locals.authUser as UserRecord;
@@ -84,8 +85,15 @@ export function createAuthenticationMiddleware({
     next();
   };
   const requireModerator: RequestHandler = (_request, response, next) => {
-    if (authenticatedUser(response).role !== "moderator") {
+    if (!["moderator", "admin"].includes(authenticatedUser(response).role)) {
       response.status(403).json({ error: moderatorRequiredError });
+      return;
+    }
+    next();
+  };
+  const requireAdmin: RequestHandler = (_request, response, next) => {
+    if (authenticatedUser(response).role !== "admin") {
+      response.status(403).json({ error: adminRequiredError });
       return;
     }
     next();
@@ -98,5 +106,5 @@ export function createAuthenticationMiddleware({
     next();
   };
 
-  return { optionalAuthentication, requireAuthentication, requireStudent, requireModerator, requireUnblocked };
+  return { optionalAuthentication, requireAuthentication, requireStudent, requireModerator, requireAdmin, requireUnblocked };
 }

@@ -11,7 +11,7 @@ export type AuthUser = {
   id: number;
   name: string;
   email: string;
-  role: "student" | "moderator";
+  role: "student" | "moderator" | "admin";
   course: { id: number; name: string } | null;
   isBlocked?: boolean;
 };

@@ -16,6 +16,8 @@ O projeto exercita, em fatias pequenas, a integração entre persistência relac
 - cadastro e login local de alunos com sessão JWT;
 - autoria, criação, edição e exclusão das próprias avaliações fictícias;
 - ciclo de publicação de avaliações, denúncias e moderação por uma conta fictícia dedicada;
+- papel administrativo local para manutenção segura do catálogo fictício;
+- painel `/admin` com CRUD de departamentos, cursos, disciplinas, professores e seus relacionamentos;
 - área de conta e listagem das avaliações do aluno;
 - validação de parâmetros e corpos de requisição com respostas de erro previsíveis;
 - persistência em PostgreSQL por migrations e seed repetível;
@@ -123,12 +125,13 @@ Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker comp
 - `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
 - `db:generate` gera uma nova migration depois de uma alteração aprovada no schema Drizzle.
 
-O seed também cria duas contas exclusivamente locais e fictícias, sem substituir senhas caso elas já existam:
+O seed também cria três contas exclusivamente locais e fictícias, sem substituir senhas caso elas já existam:
 
 | Perfil | E-mail | Senha demonstrativa |
 | --- | --- | --- |
 | Aluno | `ana@student.profrate.test` | `ProfRate#2026Aluno` |
 | Moderador | `moderador@profrate.test` | `ProfRate#2026Moderador` |
+| Administrador | `admin@profrate.test` | `ProfRate#2026Admin` |
 
 Essas credenciais são dados de demonstração, não devem ser reutilizadas fora deste ambiente e não representam pessoas reais. O banco armazena apenas hashes bcrypt das senhas.
 
@@ -168,10 +171,20 @@ pnpm --filter @profrate/api db:generate
 | GET | `/moderation/users` | Moderador busca usuários por nome ou e-mail |
 | PATCH | `/moderation/users/:userId/block` | Moderador bloqueia um usuário, exceto a própria conta |
 | PATCH | `/moderation/users/:userId/unblock` | Moderador desbloqueia um usuário |
+| GET, POST | `/admin/departments` | Admin lista ou cria departamentos |
+| PATCH, DELETE | `/admin/departments/:departmentId` | Admin edita ou exclui departamento sem referências |
+| GET, POST | `/admin/courses` | Admin lista ou cria cursos |
+| PATCH, DELETE | `/admin/courses/:courseId` | Admin edita ou exclui curso sem referências |
+| GET, POST | `/admin/disciplines` | Admin lista ou cria disciplinas e cursos relacionados |
+| PATCH, DELETE | `/admin/disciplines/:disciplineId` | Admin edita ou exclui disciplina sem referências |
+| GET, POST | `/admin/professors` | Admin lista ou cria professores e disciplinas relacionadas |
+| PATCH, DELETE | `/admin/professors/:professorId` | Admin edita ou exclui professor sem referências |
 
 As rotas públicas de catálogo continuam sem exigir sessão e só exibem avaliações `published`; pendentes e removidas não influenciam médias nem contagens. Escritas de avaliações e denúncias usam `Authorization: Bearer <token>`, aceitam um objeto `ratings` completo — quatro critérios para professor ou três para disciplina — e `comment` ou motivo não vazio. A média decimal `rating` é derivada pelo PostgreSQL e não é aceita no corpo da requisição; o autor vem exclusivamente do token. Usuários bloqueados continuam lendo os dados, mas não podem criar, editar, excluir ou denunciar avaliações. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
 
-Senhas são validadas na borda, armazenadas com bcrypt (custo 12) e nunca registradas ou devolvidas. O JWT é criado e verificado pelo `jose`; a API valida assinatura, expiração, formato do payload, existência, estado e papel atual do usuário antes de autorizar uma operação.
+Senhas são validadas na borda, armazenadas com bcrypt (custo 12) e nunca registradas ou devolvidas. O JWT é criado e verificado pelo `jose`; a API valida assinatura, expiração, formato do payload, existência, estado e papel atual do usuário antes de autorizar uma operação. O cadastro público cria somente alunos. Administradores também podem acessar a moderação, mas apenas administradores acessam `/admin`.
+
+Os corpos administrativos são objetos estritos: nomes são normalizados, IDs são inteiros positivos, relações não aceitam IDs repetidos e referências devem existir. As alterações de relações são transacionais. Exclusões retornam `409` quando o catálogo ou avaliações ainda dependem do recurso, em vez de remover conteúdo relacionado em cascata.
 
 ## Verificações
 

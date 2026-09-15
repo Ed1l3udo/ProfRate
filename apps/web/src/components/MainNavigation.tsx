@@ -13,7 +13,8 @@ export function MainNavigation() {
         {status === "authenticated" && user?.role === "student" ? (
           <NavLink to="/my-reviews">Minhas avaliações</NavLink>
         ) : null}
-        {status === "authenticated" && user?.role === "moderator" ? <NavLink to="/moderation">Moderação</NavLink> : null}
+        {status === "authenticated" && (user?.role === "moderator" || user?.role === "admin") ? <NavLink to="/moderation">Moderação</NavLink> : null}
+        {status === "authenticated" && user?.role === "admin" ? <NavLink to="/admin">Administração</NavLink> : null}
         {status === "authenticated" ? <NavLink to="/account">Minha conta</NavLink> : null}
       </div>
       <div className="main-navigation-session">

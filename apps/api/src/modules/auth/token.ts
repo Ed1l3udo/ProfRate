@@ -4,7 +4,7 @@ import { z } from "zod";
 const TOKEN_LIFETIME = "7d";
 const tokenPayloadSchema = z.object({
   userId: z.number().int().positive(),
-  role: z.enum(["student", "moderator"]),
+  role: z.enum(["student", "moderator", "admin"]),
 });
 
 export type AuthIdentity = z.infer<typeof tokenPayloadSchema>;

@@ -63,6 +63,8 @@ import type { ReviewsRepository } from "./modules/reviews/repository.js";
 import type { ReportsRepository } from "./modules/reports/repository.js";
 import { createReportBodySchema, duplicateReportError, invalidReportInputError, ownReviewReportError, reportNotFoundError, reviewNotReportableError } from "./modules/reports/schemas.js";
 import type { ModerationRepository } from "./modules/moderation/repository.js";
+import type { AdminRepository } from "./modules/admin/repository.js";
+import { createAdminRouter } from "./modules/admin/routes.js";
 import { invalidModerationInputError, moderationConflictError, moderationIdParamsSchema, moderationReportQuerySchema, moderationReportStatusSchema, moderationReviewStatusSchema, moderationStatusQuerySchema, moderationUserNotFoundError, moderationUserQuerySchema, selfBlockError } from "./modules/moderation/schemas.js";
 import {
   publicUser,
@@ -107,6 +109,7 @@ export function createApp({
   setReviewStatus = async () => undefined,
   listModerationUsers = async () => [],
   setBlocked = async () => undefined,
+  adminRepository,
   findDisciplineById = async () => undefined,
   listCourses = async () => [],
   listDepartments = async () => [],
@@ -153,6 +156,7 @@ export function createApp({
   setReviewStatus?: ModerationRepository["setReviewStatus"];
   listModerationUsers?: ModerationRepository["listUsers"];
   setBlocked?: ModerationRepository["setBlocked"];
+  adminRepository?: AdminRepository;
   findDisciplineById?: DisciplinesRepository["findDisciplineById"];
   listCourses?: CoursesRepository["listCourses"];
   listDepartments?: DepartmentsRepository["listDepartments"];
@@ -175,6 +179,7 @@ export function createApp({
     requireAuthentication,
     requireStudent,
     requireModerator,
+    requireAdmin,
     requireUnblocked,
   } = createAuthenticationMiddleware({ findUserById, verifyToken });
 
@@ -754,6 +759,10 @@ export function createApp({
       const user = await setBlocked({ id: params.data.id, blocked });
       return user === undefined ? response.status(404).json({ error: moderationUserNotFoundError }) : response.status(200).json(user);
     });
+  }
+
+  if (adminRepository !== undefined) {
+    app.use("/admin", createAdminRouter({ repository: adminRepository, requireAuthentication, requireAdmin }));
   }
 
   app.use(

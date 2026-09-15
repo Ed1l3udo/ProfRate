@@ -25,6 +25,7 @@ import { createProfessorsRepository } from "../../src/modules/professors/reposit
 import { createReviewsRepository } from "../../src/modules/reviews/repository.js";
 import { createReportsRepository } from "../../src/modules/reports/repository.js";
 import { createModerationRepository } from "../../src/modules/moderation/repository.js";
+import { createAdminRepository } from "../../src/modules/admin/repository.js";
 import { createUsersRepository } from "../../src/modules/users/repository.js";
 
 const integrationDatabaseName = "profrate_test";
@@ -149,6 +150,7 @@ type IntegrationContext = {
   reviewsRepository: ReturnType<typeof createReviewsRepository>;
   reportsRepository: ReturnType<typeof createReportsRepository>;
   moderationRepository: ReturnType<typeof createModerationRepository>;
+  adminRepository: ReturnType<typeof createAdminRepository>;
   departmentsRepository: ReturnType<typeof createDepartmentsRepository>;
   coursesRepository: ReturnType<typeof createCoursesRepository>;
   disciplinesRepository: ReturnType<typeof createDisciplinesRepository>;
@@ -181,6 +183,7 @@ export async function initializeIntegrationDatabase(): Promise<void> {
       reviewsRepository: createReviewsRepository(database.db),
       reportsRepository: createReportsRepository(database.db),
       moderationRepository: createModerationRepository(database.db),
+      adminRepository: createAdminRepository(database.db),
       departmentsRepository: createDepartmentsRepository(database.db),
       coursesRepository: createCoursesRepository(database.db),
       disciplinesRepository: createDisciplinesRepository(database.db),
@@ -277,6 +280,13 @@ export async function resetIntegrationDatabase(): Promise<void> {
       email: "moderador.teste@profrate.test",
       passwordHash: fixturePasswordHash,
       role: "moderator",
+      courseId: null,
+    },
+    {
+      name: "Administrador Teste",
+      email: "administrador.teste@profrate.test",
+      passwordHash: fixturePasswordHash,
+      role: "admin",
       courseId: null,
     },
   ]);

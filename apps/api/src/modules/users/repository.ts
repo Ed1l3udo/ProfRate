@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import type { Database } from "../../db/database.js";
 import { courses, users } from "../../db/schema.js";
 
-export type UserRole = "student" | "moderator";
+export type UserRole = "student" | "moderator" | "admin";
 
 function userSelection() {
   return {
