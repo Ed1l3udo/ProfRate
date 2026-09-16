@@ -65,6 +65,8 @@ import { createReportBodySchema, duplicateReportError, invalidReportInputError, 
 import type { ModerationRepository } from "./modules/moderation/repository.js";
 import type { AdminRepository } from "./modules/admin/repository.js";
 import { createAdminRouter } from "./modules/admin/routes.js";
+import type { DiscoveryRepository } from "./modules/discovery/repository.js";
+import { discoveryNotFound, invalidDiscoveryInput, ownReviewHelpful, rankingQuerySchema, resourceIdSchema, reviewNotHelpful } from "./modules/discovery/schemas.js";
 import { invalidModerationInputError, moderationConflictError, moderationIdParamsSchema, moderationReportQuerySchema, moderationReportStatusSchema, moderationReviewStatusSchema, moderationStatusQuerySchema, moderationUserNotFoundError, moderationUserQuerySchema, selfBlockError } from "./modules/moderation/schemas.js";
 import {
   publicUser,
@@ -110,6 +112,7 @@ export function createApp({
   listModerationUsers = async () => [],
   setBlocked = async () => undefined,
   adminRepository,
+  discoveryRepository,
   findDisciplineById = async () => undefined,
   listCourses = async () => [],
   listDepartments = async () => [],
@@ -131,7 +134,7 @@ export function createApp({
   createReview: (
     input: Parameters<ReviewsRepository["createReview"]>[0],
   ) => Promise<unknown>;
-  findProfessorById: ProfessorsRepository["findProfessorById"];
+  findProfessorById: (id: number, viewerUserId?: number) => Promise<any>;
   listProfessors: ProfessorsRepository["listProfessors"];
   listReviewsByProfessorId: (
     professorId: number,
@@ -157,7 +160,8 @@ export function createApp({
   listModerationUsers?: ModerationRepository["listUsers"];
   setBlocked?: ModerationRepository["setBlocked"];
   adminRepository?: AdminRepository;
-  findDisciplineById?: DisciplinesRepository["findDisciplineById"];
+  discoveryRepository?: DiscoveryRepository;
+  findDisciplineById?: (id: number, viewerUserId?: number) => Promise<any>;
   listCourses?: CoursesRepository["listCourses"];
   listDepartments?: DepartmentsRepository["listDepartments"];
   listDisciplines?: DisciplinesRepository["listDisciplines"];
@@ -246,6 +250,17 @@ export function createApp({
     return response.status(200).json(publicUser(authenticatedUser(response)));
   });
 
+  if (discoveryRepository !== undefined) {
+    app.get("/me/favorites", requireAuthentication, async (_request, response) => response.status(200).json(await discoveryRepository.listFavorites(authenticatedUser(response).id)));
+    for (const [path, kind] of [["/me/favorites/professors/:id", "professor"], ["/me/favorites/disciplines/:id", "discipline"]] as const) {
+      app.put(path, requireAuthentication, async (request, response) => { const params = resourceIdSchema.safeParse(request.params); if (!params.success) return response.status(400).json({ error: invalidDiscoveryInput }); const found = await discoveryRepository.setFavorite(kind, authenticatedUser(response).id, params.data.id); return found ? response.status(204).end() : response.status(404).json({ error: discoveryNotFound }); });
+      app.delete(path, requireAuthentication, async (request, response) => { const params = resourceIdSchema.safeParse(request.params); if (!params.success) return response.status(400).json({ error: invalidDiscoveryInput }); await discoveryRepository.removeFavorite(kind, authenticatedUser(response).id, params.data.id); return response.status(204).end(); });
+    }
+    app.put("/reviews/:id/helpful", requireAuthentication, requireUnblocked, async (request, response) => { const params = resourceIdSchema.safeParse(request.params); if (!params.success) return response.status(400).json({ error: invalidDiscoveryInput }); const result = await discoveryRepository.setHelpful(authenticatedUser(response).id, params.data.id); if (result === "not-found") return response.status(404).json({ error: reviewNotHelpful }); if (result === "own") return response.status(403).json({ error: ownReviewHelpful }); return response.status(204).end(); });
+    app.delete("/reviews/:id/helpful", requireAuthentication, async (request, response) => { const params = resourceIdSchema.safeParse(request.params); if (!params.success) return response.status(400).json({ error: invalidDiscoveryInput }); await discoveryRepository.removeHelpful(authenticatedUser(response).id, params.data.id); return response.status(204).end(); });
+    app.get("/rankings/:kind", async (request, response) => { if (request.params.kind !== "professors" && request.params.kind !== "disciplines") return response.status(404).end(); const query = rankingQuerySchema.safeParse(request.query); if (!query.success || (request.params.kind === "professors" && query.data.courseId !== undefined)) return response.status(400).json({ error: invalidDiscoveryInput }); return response.status(200).json(await discoveryRepository.rankings(request.params.kind, query.data)); });
+  }
+
   app.patch("/me", requireAuthentication, async (request, response) => {
     const parsedBody = updateProfileBodySchema.safeParse(request.body);
     const user = authenticatedUser(response);
@@ -310,14 +325,15 @@ export function createApp({
     return response.status(200).json(disciplines);
   });
 
-  app.get("/disciplines/:id", async (request, response) => {
+  app.get("/disciplines/:id", optionalAuthentication, async (request, response) => {
     const parsedParams = disciplineIdParamsSchema.safeParse(request.params);
 
     if (!parsedParams.success) {
       return response.status(400).json({ error: invalidDisciplineIdError });
     }
 
-    const discipline = await findDisciplineById(parsedParams.data.id);
+    const disciplineViewer = (response.locals.authUser as UserRecord | undefined)?.id;
+    const discipline = disciplineViewer === undefined ? await findDisciplineById(parsedParams.data.id) : await findDisciplineById(parsedParams.data.id, disciplineViewer);
 
     if (discipline === undefined) {
       return response.status(404).json({ error: disciplineNotFoundError });
@@ -487,7 +503,7 @@ export function createApp({
     return response.status(200).json(professors);
   });
 
-  app.get("/professors/:id", async (request, response) => {
+  app.get("/professors/:id", optionalAuthentication, async (request, response) => {
     const parsedParams = professorIdParamsSchema.safeParse(request.params);
 
     if (!parsedParams.success) {
@@ -496,7 +512,8 @@ export function createApp({
       });
     }
 
-    const professor = await findProfessorById(parsedParams.data.id);
+    const professorViewer = (response.locals.authUser as UserRecord | undefined)?.id;
+    const professor = professorViewer === undefined ? await findProfessorById(parsedParams.data.id) : await findProfessorById(parsedParams.data.id, professorViewer);
 
     if (professor === undefined) {
       return response.status(404).json({

@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router";
 
 import { useAuth } from "../auth/AuthContext.js";
 import { ProfessorReviews } from "../components/ProfessorReviews.js";
+import { FavoriteButton } from "../components/FavoriteButton.js";
 import type { ProfessorDetails } from "../types/professor.js";
 import {
   createProfessorSearchParams,
@@ -90,6 +91,7 @@ export function ProfessorDetailsPage() {
       <main className="page-shell">
         <h1>{professor.name}</h1>
         <p className="professor-department">Departamento: {professor.department}</p>
+        <FavoriteButton kind="professors" id={professor.id} initial={professor.isFavorite} />
         <ProfessorReviews professorId={professor.id} />
         <Link className="back-link" to={returnTo}>Voltar para a lista</Link>
       </main>

@@ -46,6 +46,8 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
   const [ratings, setRatings] = useState<RatingInputs>(() => ratingInputsFrom(review));
   const [comment, setComment] = useState(review.comment);
   const [editFeedback, setEditFeedback] = useState<EditFeedback>(null);
+  const [helpful, setHelpful] = useState({ count: review.helpfulCount ?? 0, marked: review.viewerHasMarkedHelpful ?? false });
+  const [isMarkingHelpful, setIsMarkingHelpful] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
@@ -158,6 +160,10 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
       : "review-character-count";
   const ratingValues = review.ratings as unknown as Record<CriterionKey, number>;
   const canModify = review.canManage && !user?.isBlocked;
+  async function toggleHelpful() {
+    if (isMarkingHelpful) return; setIsMarkingHelpful(true);
+    try { const response = await apiFetch(`/api/reviews/${review.id}/helpful`, { method: helpful.marked ? "DELETE" : "PUT" }); if (response.status === 204) setHelpful(current => ({ marked: !current.marked, count: Math.max(0, current.count + (current.marked ? -1 : 1)) })); } finally { setIsMarkingHelpful(false); }
+  }
 
   return (
     <li className="review-card">
@@ -202,6 +208,8 @@ export function ReviewItem({ review, subject, onDeleted, onUpdated }: {
             {config.criteria.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{ratingValues[key]}/5</dd></div>)}
           </dl>
           <p className="review-comment">{review.comment}</p>
+          <p>{helpful.count} {helpful.count === 1 ? "pessoa achou útil" : "pessoas acharam útil"}</p>
+          {review.canMarkHelpful && !user?.isBlocked ? <button type="button" disabled={isMarkingHelpful} onClick={() => void toggleHelpful()}>{helpful.marked ? "Remover marcação" : "Marcar como útil"}</button> : null}
           <p className="review-date">Criada em: <time dateTime={review.createdAt}>{reviewDateFormatter.format(new Date(review.createdAt))} UTC</time></p>
           {Date.parse(review.updatedAt) > Date.parse(review.createdAt) ? (
             <p className="review-date">Atualizada em: <time dateTime={review.updatedAt}>{reviewDateFormatter.format(new Date(review.updatedAt))} UTC</time></p>

@@ -6,6 +6,7 @@ import {
   courses,
   departments,
   disciplines,
+  favoriteDisciplines,
   professorDisciplines,
   professors,
   reviews,
@@ -107,7 +108,7 @@ export function createDisciplinesRepository(db: Database) {
     }));
   }
 
-  async function findDisciplineById(id: number) {
+  async function findDisciplineById(id: number, viewerUserId?: number) {
     const rows = await db
       .select({
         id: disciplines.id,
@@ -116,6 +117,7 @@ export function createDisciplinesRepository(db: Database) {
         workloadHours: disciplines.workloadHours,
         departmentId: departments.id,
         departmentName: departments.name,
+        isFavorite: viewerUserId === undefined ? sql<boolean>`false` : sql<boolean>`exists (select 1 from ${favoriteDisciplines} where ${favoriteDisciplines.disciplineId} = ${disciplines.id} and ${favoriteDisciplines.userId} = ${viewerUserId})`,
         reviewCount: sql<number>`(
           select count(*)::integer from ${reviews}
           where ${reviews.disciplineId} = ${disciplines.id} and ${reviews.status} = 'published'
@@ -159,7 +161,7 @@ export function createDisciplinesRepository(db: Database) {
       department: { id: row.departmentId, name: row.departmentName },
     };
 
-    return { ...discipline, courses: courseRows, professors: professorRows };
+    return { ...discipline, isFavorite: row.isFavorite, courses: courseRows, professors: professorRows };
   }
 
   return { findDisciplineById, listDisciplines };

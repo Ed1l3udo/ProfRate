@@ -10,6 +10,8 @@ export function MainNavigation() {
       <div className="main-navigation-links">
         <NavLink to="/" end>Professores</NavLink>
         <NavLink to="/disciplines">Disciplinas</NavLink>
+        <NavLink to="/rankings">Rankings</NavLink>
+        {status === "authenticated" ? <NavLink to="/favorites">Favoritos</NavLink> : null}
         {status === "authenticated" && user?.role === "student" ? (
           <NavLink to="/my-reviews">Minhas avaliações</NavLink>
         ) : null}

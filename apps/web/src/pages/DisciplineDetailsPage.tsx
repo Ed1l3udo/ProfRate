@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router";
 
 import { useAuth } from "../auth/AuthContext.js";
 import { ReviewsSection } from "../components/ProfessorReviews.js";
+import { FavoriteButton } from "../components/FavoriteButton.js";
 import type { DisciplineDetails } from "../types/discipline.js";
 import { createDisciplineSearchParams, readDisciplineFilters } from "../utils/disciplineFilters.js";
 
@@ -57,6 +58,7 @@ export function DisciplineDetailsPage() {
       <main className="page-shell">
         <p className="discipline-code">{discipline.code}</p>
         <h1>{discipline.name}</h1>
+        <FavoriteButton kind="disciplines" id={discipline.id} initial={discipline.isFavorite} />
         <dl className="discipline-metadata">
           <div><dt>Departamento</dt><dd>{discipline.department.name}</dd></div>
           <div><dt>Carga horária</dt><dd>{discipline.workloadHours} horas</dd></div>

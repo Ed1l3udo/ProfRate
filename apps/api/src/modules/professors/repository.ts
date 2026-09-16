@@ -1,7 +1,7 @@
 import { and, asc, count, eq, ilike, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/database.js";
-import { departments, professors, reviews } from "../../db/schema.js";
+import { departments, favoriteProfessors, professors, reviews } from "../../db/schema.js";
 import type { ProfessorFilters } from "./schemas.js";
 
 export function createProfessorsRepository(db: Database) {
@@ -31,12 +31,13 @@ export function createProfessorsRepository(db: Database) {
       .orderBy(asc(professors.id));
   }
 
-  async function findProfessorById(id: number) {
+  async function findProfessorById(id: number, viewerUserId?: number) {
     const professorsFound = await db
       .select({
         id: professors.id,
         name: professors.name,
         department: departments.name,
+        isFavorite: viewerUserId === undefined ? sql<boolean>`false` : sql<boolean>`exists (select 1 from ${favoriteProfessors} where ${favoriteProfessors.professorId} = ${professors.id} and ${favoriteProfessors.userId} = ${viewerUserId})`,
       })
       .from(professors)
       .innerJoin(departments, eq(departments.id, professors.departmentId))

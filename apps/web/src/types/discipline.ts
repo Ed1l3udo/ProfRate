@@ -19,5 +19,6 @@ export type DisciplineListItem = {
 };
 
 export type DisciplineDetails = DisciplineListItem & {
+  isFavorite?: boolean;
   professors: Array<{ id: number; name: string }>;
 };

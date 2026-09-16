@@ -18,6 +18,7 @@ O projeto exercita, em fatias pequenas, a integração entre persistência relac
 - ciclo de publicação de avaliações, denúncias e moderação por uma conta fictícia dedicada;
 - papel administrativo local para manutenção segura do catálogo fictício;
 - painel `/admin` com CRUD de departamentos, cursos, disciplinas, professores e seus relacionamentos;
+- rankings públicos, favoritos pessoais e marcações de avaliações úteis;
 - área de conta e listagem das avaliações do aluno;
 - validação de parâmetros e corpos de requisição com respostas de erro previsíveis;
 - persistência em PostgreSQL por migrations e seed repetível;
@@ -179,6 +180,11 @@ pnpm --filter @profrate/api db:generate
 | PATCH, DELETE | `/admin/disciplines/:disciplineId` | Admin edita ou exclui disciplina sem referências |
 | GET, POST | `/admin/professors` | Admin lista ou cria professores e disciplinas relacionadas |
 | PATCH, DELETE | `/admin/professors/:professorId` | Admin edita ou exclui professor sem referências |
+| GET | `/rankings/professors`, `/rankings/disciplines` | Rankings públicos por avaliações publicadas |
+| GET | `/me/favorites` | Favoritos separados do usuário autenticado |
+| PUT, DELETE | `/me/favorites/professors/:id` | Adiciona ou remove favorito de professor de modo idempotente |
+| PUT, DELETE | `/me/favorites/disciplines/:id` | Adiciona ou remove favorito de disciplina de modo idempotente |
+| PUT, DELETE | `/reviews/:id/helpful` | Marca ou remove uma marcação útil em review publicada |
 
 As rotas públicas de catálogo continuam sem exigir sessão e só exibem avaliações `published`; pendentes e removidas não influenciam médias nem contagens. Escritas de avaliações e denúncias usam `Authorization: Bearer <token>`, aceitam um objeto `ratings` completo — quatro critérios para professor ou três para disciplina — e `comment` ou motivo não vazio. A média decimal `rating` é derivada pelo PostgreSQL e não é aceita no corpo da requisição; o autor vem exclusivamente do token. Usuários bloqueados continuam lendo os dados, mas não podem criar, editar, excluir ou denunciar avaliações. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
 

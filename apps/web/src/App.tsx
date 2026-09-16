@@ -13,6 +13,8 @@ import { ProfessorsListPage } from "./pages/ProfessorsListPage.js";
 import { SignupPage } from "./pages/SignupPage.js";
 import { ModerationPage } from "./pages/ModerationPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
+import { FavoritesPage } from "./pages/FavoritesPage.js";
+import { RankingsPage } from "./pages/RankingsPage.js";
 
 export function App() {
   return (
@@ -23,6 +25,8 @@ export function App() {
         <Route path="/professors/:id" element={<ProfessorDetailsPage />} />
         <Route path="/disciplines" element={<DisciplinesListPage />} />
         <Route path="/disciplines/:id" element={<DisciplineDetailsPage />} />
+        <Route path="/rankings" element={<RankingsPage />} />
+        <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/account" element={(

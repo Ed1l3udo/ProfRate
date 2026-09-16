@@ -11,6 +11,9 @@ import {
   professors,
   reports,
   reviews,
+  favoriteProfessors,
+  favoriteDisciplines,
+  helpfulReviews,
   users,
 } from "./schema.js";
 
@@ -286,6 +289,10 @@ try {
         reason: "Denúncia fictícia pendente para demonstração local.",
       });
     }
+    const firstDisciplineId = requiredId(disciplineIds, "CMP101", "discipline");
+    await transaction.insert(favoriteProfessors).values({ userId: seedStudent!.id, professorId: adaProfessorId }).onConflictDoNothing();
+    await transaction.insert(favoriteDisciplines).values({ userId: seedStudent!.id, disciplineId: firstDisciplineId }).onConflictDoNothing();
+    await transaction.insert(helpfulReviews).values({ userId: seedStudent!.id, reviewId: publishedReview!.id }).onConflictDoNothing();
   });
 
   console.log("Academic catalog seed completed.");

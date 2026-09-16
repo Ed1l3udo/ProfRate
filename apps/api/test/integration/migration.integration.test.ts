@@ -18,6 +18,9 @@ it("backfills a populated legacy professor review with the real 0007 migration",
 
   try {
     await client.query("BEGIN");
+    await client.query('DROP TABLE "helpful_reviews"');
+    await client.query('DROP TABLE "favorite_disciplines"');
+    await client.query('DROP TABLE "favorite_professors"');
     await client.query('DROP TABLE "reports"');
     await client.query('DROP TABLE "reviews"');
     await client.query(`

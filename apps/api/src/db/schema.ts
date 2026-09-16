@@ -243,3 +243,21 @@ export const reports = pgTable(
     check("reports_reason_max_500", sql`char_length(${table.reason}) <= 500`),
   ],
 );
+
+export const favoriteProfessors = pgTable("favorite_professors", {
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  professorId: integer("professor_id").notNull().references(() => professors.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.userId, table.professorId] }), index("favorite_professors_professor_id_idx").on(table.professorId)]);
+
+export const favoriteDisciplines = pgTable("favorite_disciplines", {
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  disciplineId: integer("discipline_id").notNull().references(() => disciplines.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.userId, table.disciplineId] }), index("favorite_disciplines_discipline_id_idx").on(table.disciplineId)]);
+
+export const helpfulReviews = pgTable("helpful_reviews", {
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reviewId: integer("review_id").notNull().references(() => reviews.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.userId, table.reviewId] }), index("helpful_reviews_review_id_idx").on(table.reviewId)]);

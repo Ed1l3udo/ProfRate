@@ -276,6 +276,7 @@ it("returns discipline details with courses and professors", async () => {
   await expect(disciplinesRepository.findDisciplineById(1)).resolves.toStrictEqual({
     id: 1,
     code: "TST101",
+    isFavorite: false,
     name: "Programação de Teste",
     workloadHours: 64,
     reviewCount: 0,
@@ -416,7 +417,7 @@ it("finds an existing professor and returns undefined for a missing id", async (
   const { professorsRepository } = getIntegrationContext();
 
   await expect(professorsRepository.findProfessorById(2)).resolves.toStrictEqual(
-    { id: 2, name: "Bruno Teste", department: "Departamento Beta" },
+    { id: 2, name: "Bruno Teste", department: "Departamento Beta", isFavorite: false },
   );
   await expect(
     professorsRepository.findProfessorById(999_999),

@@ -18,6 +18,9 @@ type ReviewBase = {
   createdAt: string;
   updatedAt: string;
   canManage: boolean;
+  helpfulCount?: number;
+  viewerHasMarkedHelpful?: boolean;
+  canMarkHelpful?: boolean;
   status?: "pending" | "published" | "removed";
 };
 

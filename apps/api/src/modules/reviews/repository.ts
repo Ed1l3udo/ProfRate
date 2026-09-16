@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/database.js";
-import { disciplines, professors, reviews } from "../../db/schema.js";
+import { disciplines, helpfulReviews, professors, reviews } from "../../db/schema.js";
 import type {
   DisciplineRatings,
   DisciplineReviewUpdate,
@@ -35,7 +35,7 @@ async function selectReviewRows(_db: Database) {
   return _db.select(reviewSelection()).from(reviews);
 }
 
-function publicReview(row: ReviewRow, canManage: boolean) {
+function publicReview(row: ReviewRow, canManage: boolean, helpfulCount?: number, viewerHasMarkedHelpful?: boolean, canMarkHelpful?: boolean) {
   const common = {
     id: row.id,
     rating: row.rating,
@@ -44,6 +44,7 @@ function publicReview(row: ReviewRow, canManage: boolean) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     canManage,
+    ...(helpfulCount === undefined ? {} : { helpfulCount, viewerHasMarkedHelpful, canMarkHelpful }),
   };
 
   if (row.professorId !== null) {
@@ -82,12 +83,15 @@ export function createReviewsRepository(db: Database) {
         canManage: viewerUserId === undefined
           ? sql<boolean>`false`
           : sql<boolean>`coalesce(${reviews.authorId} = ${viewerUserId}, false)`,
+        helpfulCount: sql<number>`(select count(*)::integer from ${helpfulReviews} where ${helpfulReviews.reviewId} = ${reviews.id})`,
+        viewerHasMarkedHelpful: viewerUserId === undefined ? sql<boolean>`false` : sql<boolean>`exists (select 1 from ${helpfulReviews} where ${helpfulReviews.reviewId} = ${reviews.id} and ${helpfulReviews.userId} = ${viewerUserId})`,
+        canMarkHelpful: viewerUserId === undefined ? sql<boolean>`false` : sql<boolean>`coalesce(${reviews.authorId} <> ${viewerUserId}, true)`,
       })
       .from(reviews)
       .where(and(eq(reviews.professorId, professorId), eq(reviews.status, "published")))
       .orderBy(asc(reviews.createdAt), asc(reviews.id));
 
-    return rows.map(({ canManage, ...review }) => publicReview(review, canManage));
+    return rows.map(({ canManage, helpfulCount, viewerHasMarkedHelpful, canMarkHelpful, ...review }) => publicReview(review, canManage, viewerUserId === undefined ? undefined : helpfulCount, viewerHasMarkedHelpful, canMarkHelpful));
   }
 
   async function listReviewsByDisciplineId(disciplineId: number, viewerUserId?: number) {
@@ -97,12 +101,15 @@ export function createReviewsRepository(db: Database) {
         canManage: viewerUserId === undefined
           ? sql<boolean>`false`
           : sql<boolean>`coalesce(${reviews.authorId} = ${viewerUserId}, false)`,
+        helpfulCount: sql<number>`(select count(*)::integer from ${helpfulReviews} where ${helpfulReviews.reviewId} = ${reviews.id})`,
+        viewerHasMarkedHelpful: viewerUserId === undefined ? sql<boolean>`false` : sql<boolean>`exists (select 1 from ${helpfulReviews} where ${helpfulReviews.reviewId} = ${reviews.id} and ${helpfulReviews.userId} = ${viewerUserId})`,
+        canMarkHelpful: viewerUserId === undefined ? sql<boolean>`false` : sql<boolean>`coalesce(${reviews.authorId} <> ${viewerUserId}, true)`,
       })
       .from(reviews)
       .where(and(eq(reviews.disciplineId, disciplineId), eq(reviews.status, "published")))
       .orderBy(asc(reviews.createdAt), asc(reviews.id));
 
-    return rows.map(({ canManage, ...review }) => publicReview(review, canManage));
+    return rows.map(({ canManage, helpfulCount, viewerHasMarkedHelpful, canMarkHelpful, ...review }) => publicReview(review, canManage, viewerUserId === undefined ? undefined : helpfulCount, viewerHasMarkedHelpful, canMarkHelpful));
   }
 
   async function createProfessorReview(input: {

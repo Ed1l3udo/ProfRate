@@ -10,6 +10,7 @@ import { createReviewsRepository } from "./modules/reviews/repository.js";
 import { createReportsRepository } from "./modules/reports/repository.js";
 import { createModerationRepository } from "./modules/moderation/repository.js";
 import { createAdminRepository } from "./modules/admin/repository.js";
+import { createDiscoveryRepository } from "./modules/discovery/repository.js";
 import { createUsersRepository } from "./modules/users/repository.js";
 
 const port = Number(process.env.PORT ?? 3000);
@@ -24,6 +25,7 @@ const reviewsRepository = createReviewsRepository(db);
 const reportsRepository = createReportsRepository(db);
 const moderationRepository = createModerationRepository(db);
 const adminRepository = createAdminRepository(db);
+const discoveryRepository = createDiscoveryRepository(db);
 const departmentsRepository = createDepartmentsRepository(db);
 const coursesRepository = createCoursesRepository(db);
 const disciplinesRepository = createDisciplinesRepository(db);
@@ -36,6 +38,7 @@ const app = createApp({
   ...reportsRepository,
   ...moderationRepository,
   adminRepository,
+  discoveryRepository,
   listModerationReviews: moderationRepository.listReviews,
   listModerationUsers: moderationRepository.listUsers,
   ...departmentsRepository,
