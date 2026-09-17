@@ -42,6 +42,7 @@ export function App() {
         <Route path="/moderation" element={<ProtectedRoute moderatorOnly><ModerationPage /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
       </Routes>
+      <footer className="app-footer">ProfRate é uma demonstração local com dados inteiramente fictícios.</footer>
     </AuthProvider>
   );
 }

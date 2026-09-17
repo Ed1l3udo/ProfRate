@@ -56,7 +56,9 @@ export function LoginPage() {
 
   return (
     <main className="page-shell auth-page">
+      <p className="eyebrow">Acesso local</p>
       <h1>Entrar</h1>
+      <p className="page-intro">Acesse sua conta de demonstração para registrar e acompanhar avaliações.</p>
       <form className="auth-form" onSubmit={handleSubmit}>
         <label htmlFor="login-email">E-mail</label>
         <input id="login-email" type="email" autoComplete="email" value={email}
@@ -69,7 +71,7 @@ export function LoginPage() {
         </button>
         {feedback !== null ? <p className="form-feedback" role="alert">{feedback}</p> : null}
       </form>
-      <p>Não possui conta? <Link to="/signup">Criar conta</Link></p>
+      <p>Não possui conta? <Link to="/signup">Criar conta</Link> · <Link to="/forgot-password">Recuperar senha</Link></p>
     </main>
   );
 }

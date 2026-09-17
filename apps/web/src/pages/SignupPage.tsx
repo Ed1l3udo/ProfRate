@@ -69,6 +69,7 @@ export function SignupPage() {
 
   return (
     <main className="page-shell auth-page">
+      <p className="eyebrow">Conta de demonstração</p>
       <h1>Criar conta</h1>
       <p className="page-intro">Conta local e fictícia para demonstração.</p>
       <form className="auth-form" onSubmit={handleSubmit}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "../auth/AuthContext.js";
 import { ReviewItem } from "../components/ReviewItem.js";
+import { EmptyState, ErrorState, LoadingState } from "../components/States.js";
 import type { MyReview, Review } from "../types/review.js";
 
 type LoadState = "loading" | "success" | "error";
@@ -38,10 +39,10 @@ export function MyReviewsPage() {
 
   return (
     <main className="page-shell">
-      <h1>Minhas avaliações</h1>
-      {loadState === "loading" ? <p className="inline-state">Carregando suas avaliações...</p> : null}
-      {loadState === "error" ? <p className="inline-state" role="alert">Não foi possível carregar suas avaliações.</p> : null}
-      {loadState === "success" && reviews.length === 0 ? <p className="inline-state">Você ainda não publicou avaliações.</p> : null}
+      <header className="page-header"><p className="eyebrow">Sua participação</p><h1>Minhas avaliações</h1><p className="page-intro">Acompanhe o status e atualize as avaliações que você escreveu.</p></header>
+      {loadState === "loading" ? <LoadingState>Carregando suas avaliações...</LoadingState> : null}
+      {loadState === "error" ? <ErrorState>Não foi possível carregar suas avaliações.</ErrorState> : null}
+      {loadState === "success" && reviews.length === 0 ? <EmptyState title="Você ainda não publicou avaliações." action={{ to: "/", label: "Explorar professores" }}>Quando você publicar uma avaliação, ela aparecerá aqui.</EmptyState> : null}
       {loadState === "success" && reviews.length > 0 ? (
         <ul className="review-list my-review-list">
           {reviews.map((review) => (
