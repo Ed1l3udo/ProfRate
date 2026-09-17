@@ -60,7 +60,7 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
   const professorsResponse = await request(app).get("/professors");
 
   expect(professorsResponse.status).toBe(200);
-  expect(professorsResponse.body).toStrictEqual([
+  expect(professorsResponse.body.items).toStrictEqual([
     {
       id: 1,
       name: "Alice Teste",
@@ -83,6 +83,12 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
       averageRating: null,
     },
   ]);
+  expect(professorsResponse.body.pagination).toStrictEqual({
+    page: 1,
+    pageSize: 12,
+    totalItems: 3,
+    totalPages: 1,
+  });
 
   const createResponse = await request(app)
     .post("/professors/1/reviews")
@@ -101,7 +107,7 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     createdAt: expect.stringMatching(isoUtcTimestamp),
     updatedAt: expect.stringMatching(isoUtcTimestamp),
     canManage: true,
-    status: "pending",
+    status: "published",
   });
   expect(createResponse.body.updatedAt).toBe(createResponse.body.createdAt);
 
@@ -110,7 +116,9 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     .set("Authorization", authorization);
 
   expect(afterCreateResponse.status).toBe(200);
-  expect(afterCreateResponse.body).not.toContainEqual(createResponse.body);
+  expect(afterCreateResponse.body).toContainEqual(
+    expect.objectContaining(createResponse.body),
+  );
 
   const updateResponse = await request(app)
     .patch(`/professors/1/reviews/${createResponse.body.id}`)
@@ -129,7 +137,7 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     createdAt: createResponse.body.createdAt,
     updatedAt: expect.stringMatching(isoUtcTimestamp),
     canManage: true,
-    status: "pending",
+    status: "published",
   });
 
   const afterUpdateResponse = await request(app)
@@ -137,7 +145,9 @@ it("persists the essential review lifecycle through the HTTP API", async () => {
     .set("Authorization", authorization);
 
   expect(afterUpdateResponse.status).toBe(200);
-  expect(afterUpdateResponse.body).not.toContainEqual(updateResponse.body);
+  expect(afterUpdateResponse.body).toContainEqual(
+    expect.objectContaining(updateResponse.body),
+  );
 
   const deleteResponse = await request(app).delete(
     `/professors/1/reviews/${createResponse.body.id}`,
@@ -228,7 +238,13 @@ it("serves the catalog through the HTTP API with real repositories", async () =>
     { id: 2, name: "Curso Beta", departmentId: 2, department: "Departamento Beta" },
   ]);
   expect(disciplinesResponse.status).toBe(200);
-  expect(disciplinesResponse.body).toHaveLength(1);
+  expect(disciplinesResponse.body.items).toHaveLength(1);
+  expect(disciplinesResponse.body.pagination).toStrictEqual({
+    page: 1,
+    pageSize: 12,
+    totalItems: 1,
+    totalPages: 1,
+  });
   expect(detailsResponse.status).toBe(200);
   expect(detailsResponse.body.professors).toStrictEqual([
     { id: 1, name: "Alice Teste" },

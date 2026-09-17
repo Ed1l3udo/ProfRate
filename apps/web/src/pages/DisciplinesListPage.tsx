@@ -8,6 +8,7 @@ import {
   readDisciplineFilters,
   type DisciplineFilters,
 } from "../utils/disciplineFilters.js";
+import { Pagination } from "../components/Pagination.js";
 
 type LoadState = "loading" | "success" | "error";
 
@@ -22,6 +23,7 @@ export function DisciplinesListPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [optionsState, setOptionsState] = useState<LoadState>("loading");
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 12, totalItems: 0, totalPages: 0 });
 
   useEffect(() => setInputs(appliedFilters), [
     appliedFilters.search,
@@ -71,10 +73,12 @@ export function DisciplinesListPage() {
         const response = await apiFetch(url, { signal: controller.signal });
 
         if (!response.ok) throw new Error();
-        const data = (await response.json()) as DisciplineListItem[];
+        const payload = (await response.json()) as DisciplineListItem[] | { items: DisciplineListItem[]; pagination: typeof pagination };
+        const data = Array.isArray(payload) ? payload : payload.items;
 
         if (!controller.signal.aborted) {
           setDisciplines(data);
+          if (!Array.isArray(payload)) setPagination(payload.pagination);
           setLoadState("success");
         }
       } catch {
@@ -92,7 +96,7 @@ export function DisciplinesListPage() {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const next = createDisciplineSearchParams(inputs);
+    const next = createDisciplineSearchParams({ ...inputs, page: "1" });
     const normalized = readDisciplineFilters(next);
     setInputs(normalized);
 
@@ -104,6 +108,7 @@ export function DisciplinesListPage() {
     setInputs(empty);
     if (searchParams.toString() !== "") setSearchParams(new URLSearchParams());
   }
+  function changePage(page: number) { const next=createDisciplineSearchParams({ ...appliedFilters, page:String(page) }); if(next.toString()!==searchParams.toString()) setSearchParams(next); }
 
   const controlsDisabled = optionsState === "loading";
 
@@ -168,6 +173,7 @@ export function DisciplinesListPage() {
           ))}
         </ul>
       ) : null}
+      {loadState === "success" ? <Pagination page={pagination.page} totalPages={pagination.totalPages} onPage={changePage} /> : null}
     </main>
   );
 }

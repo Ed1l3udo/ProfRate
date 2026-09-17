@@ -24,12 +24,15 @@ export const professorIdParamsSchema = z.object({
 });
 
 const professorFilterValueSchema = z.string().trim().min(1);
+const pageSchema = z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(z.number().int().positive());
 
 export const professorFiltersSchema = z
   .object({
     search: professorFilterValueSchema.optional(),
     department: professorFilterValueSchema.optional(),
+    page: pageSchema.optional().default(1),
+    pageSize: pageSchema.pipe(z.number().max(50)).optional().default(12),
   })
   .strict();
 
-export type ProfessorFilters = z.infer<typeof professorFiltersSchema>;
+export type ProfessorFilters = { search?: string; department?: string; page?: number; pageSize?: number };

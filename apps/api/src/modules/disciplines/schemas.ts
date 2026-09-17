@@ -5,12 +5,15 @@ const positiveIntegerStringSchema = z
   .regex(/^[1-9]\d*$/)
   .transform(Number)
   .pipe(z.number().int().positive().max(2_147_483_647));
+const pageSizeSchema = positiveIntegerStringSchema.pipe(z.number().max(50));
 
 export const disciplineFiltersSchema = z
   .object({
     search: z.string().trim().min(1).optional(),
     departmentId: positiveIntegerStringSchema.optional(),
     courseId: positiveIntegerStringSchema.optional(),
+    page: positiveIntegerStringSchema.optional().default(1),
+    pageSize: pageSizeSchema.optional().default(12),
   })
   .strict();
 
@@ -31,4 +34,4 @@ export const disciplineNotFoundError = {
   message: "Discipline not found.",
 };
 
-export type DisciplineFilters = z.infer<typeof disciplineFiltersSchema>;
+export type DisciplineFilters = { search?: string; departmentId?: number; courseId?: number; page?: number; pageSize?: number };

@@ -26,6 +26,11 @@ export const loginBodySchema = z
   })
   .strict();
 
+export const forgotPasswordBodySchema = z.object({ email: emailSchema }).strict();
+export const resetPasswordBodySchema = z.object({ token: z.string().min(32).max(256), newPassword: passwordSchema }).strict();
+export const changePasswordBodySchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: passwordSchema }).strict();
+export const deleteAccountBodySchema = z.object({ password: z.string().min(1).max(128), confirmation: z.literal("DELETE") }).strict();
+
 export const updateProfileBodySchema = z
   .object({
     name: nameSchema.optional(),
@@ -63,3 +68,7 @@ export const invalidProfileUpdateError = {
   code: "INVALID_PROFILE_UPDATE",
   message: "Profile update must contain only a valid name and/or student courseId.",
 };
+export const invalidPasswordInputError = { code: "INVALID_PASSWORD_INPUT", message: "Password request contains invalid fields." };
+export const invalidResetTokenError = { code: "INVALID_RESET_TOKEN", message: "Reset token is invalid or expired." };
+export const passwordMismatchError = { code: "INVALID_CURRENT_PASSWORD", message: "Current password is incorrect." };
+export const passwordUnchangedError = { code: "PASSWORD_UNCHANGED", message: "New password must be different." };

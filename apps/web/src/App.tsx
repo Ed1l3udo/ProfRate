@@ -15,6 +15,8 @@ import { ModerationPage } from "./pages/ModerationPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { FavoritesPage } from "./pages/FavoritesPage.js";
 import { RankingsPage } from "./pages/RankingsPage.js";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage.js";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage.js";
 
 export function App() {
   return (
@@ -29,6 +31,8 @@ export function App() {
         <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/account" element={(
           <ProtectedRoute><MyAccountPage /></ProtectedRoute>
         )} />

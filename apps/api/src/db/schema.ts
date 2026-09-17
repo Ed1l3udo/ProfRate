@@ -221,9 +221,7 @@ export const reports = pgTable(
     reviewId: integer("review_id")
       .notNull()
       .references(() => reviews.id, { onDelete: "cascade" }),
-    reporterId: integer("reporter_id")
-      .notNull()
-      .references(() => users.id),
+    reporterId: integer("reporter_id").references(() => users.id, { onDelete: "set null" }),
     reason: text("reason").notNull(),
     status: reportStatus("status").notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
@@ -261,3 +259,30 @@ export const helpfulReviews = pgTable("helpful_reviews", {
   reviewId: integer("review_id").notNull().references(() => reviews.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => [primaryKey({ columns: [table.userId, table.reviewId] }), index("helpful_reviews_review_id_idx").on(table.reviewId)]);
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => [index("password_reset_tokens_user_id_idx").on(table.userId), index("password_reset_tokens_expires_at_idx").on(table.expiresAt)]);
+
+export const loginAttempts = pgTable("login_attempts", {
+  email: text("email").primaryKey(),
+  failedCount: integer("failed_count").notNull().default(0),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
+export const moderationLogs = pgTable("moderation_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  moderatorId: integer("moderator_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  targetType: text("target_type").notNull(),
+  targetId: integer("target_id").notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => [index("moderation_logs_created_at_idx").on(table.createdAt), index("moderation_logs_action_idx").on(table.action), index("moderation_logs_target_idx").on(table.targetType, table.targetId)]);

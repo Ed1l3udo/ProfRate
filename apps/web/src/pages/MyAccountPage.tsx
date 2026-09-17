@@ -1,92 +1,15 @@
-import { useEffect, useState } from "react";
-
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { useAuth, type AuthUser } from "../auth/AuthContext.js";
 import type { Course } from "../types/discipline.js";
 
 export function MyAccountPage() {
-  const { apiFetch, updateUser, user } = useAuth();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [name, setName] = useState(user?.name ?? "");
-  const [courseId, setCourseId] = useState(user?.course?.id.toString() ?? "");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (user?.role !== "student") return;
-    const controller = new AbortController();
-    apiFetch("/api/courses", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error();
-        const data = (await response.json()) as Course[];
-        if (!controller.signal.aborted) setCourses(data);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setFeedback("Não foi possível carregar os cursos.");
-      });
-    return () => controller.abort();
-  }, [apiFetch, user?.role]);
-
-  if (user === null) return null;
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (isSubmitting || user === null) return;
-    setIsSubmitting(true);
-    setFeedback(null);
-
-    try {
-      const body = user.role === "student"
-        ? { name, courseId: Number(courseId) }
-        : { name };
-      const response = await apiFetch("/api/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        setFeedback("Não foi possível atualizar a conta.");
-        return;
-      }
-
-      const updated = (await response.json()) as AuthUser;
-      updateUser(updated);
-      setName(updated.name);
-      setCourseId(updated.course?.id.toString() ?? "");
-      setFeedback("Conta atualizada com sucesso.");
-    } catch {
-      setFeedback("Não foi possível atualizar a conta.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  return (
-    <main className="page-shell auth-page">
-      <h1>Minha conta</h1>
-      {user.isBlocked ? <p className="form-feedback" role="alert">Sua conta está bloqueada para criar, editar, excluir ou denunciar avaliações. Você ainda pode consultar seus dados e o catálogo.</p> : null}
-      <dl className="account-summary">
-        <div><dt>E-mail</dt><dd>{user.email}</dd></div>
-        <div><dt>Perfil</dt><dd>{user.role === "student" ? "Aluno" : user.role === "moderator" ? "Moderador" : "Administrador"}</dd></div>
-        <div><dt>Curso</dt><dd>{user.course?.name ?? "Não vinculado"}</dd></div>
-      </dl>
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <label htmlFor="account-name">Nome</label>
-        <input id="account-name" value={name} onChange={(event) => setName(event.target.value)} />
-        {user.role === "student" ? (
-          <>
-            <label htmlFor="account-course">Curso</label>
-            <select id="account-course" value={courseId}
-              onChange={(event) => setCourseId(event.target.value)}>
-              {courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
-            </select>
-          </>
-        ) : null}
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Salvando..." : "Salvar alterações"}
-        </button>
-        {feedback !== null ? <p className="form-feedback" role="status">{feedback}</p> : null}
-      </form>
-    </main>
-  );
+  const { apiFetch, updateUser, user, logout } = useAuth(); const navigate = useNavigate();
+  const [courses, setCourses] = useState<Course[]>([]); const [name,setName]=useState(user?.name??""); const [courseId,setCourseId]=useState(String(user?.course?.id??"")); const [profile,setProfile]=useState<string|null>(null); const [busy,setBusy]=useState(false);
+  useEffect(()=>{if(user?.role!=="student")return;const c=new AbortController();apiFetch("/api/courses",{signal:c.signal}).then(r=>r.ok?r.json():Promise.reject()).then(d=>!c.signal.aborted&&setCourses(d)).catch(()=>!c.signal.aborted&&setProfile("Não foi possível carregar os cursos."));return()=>c.abort();},[apiFetch,user?.role]);
+  if(!user)return null;
+async function save(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);try{const r=await apiFetch("/api/me",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(user!.role==="student"?{name,courseId:Number(courseId)}:{name})});if(!r.ok)throw new Error();const next=await r.json() as AuthUser;updateUser(next);setName(next.name);setCourseId(String(next.course?.id??""));setProfile("Conta atualizada com sucesso.");}catch{setProfile("Não foi possível atualizar o perfil.");}finally{setBusy(false);}}
+  return <main className="page-shell auth-page"><h1>Minha conta</h1>{user.isBlocked?<p role="alert">Sua conta está bloqueada para interações.</p>:null}<dl className="account-summary"><div><dt>E-mail</dt><dd>{user.email}</dd></div><div><dt>Perfil</dt><dd>{user.role}</dd></div></dl><section><h2>Perfil</h2><form className="auth-form" onSubmit={save}><label>Nome<input value={name} onChange={e=>setName(e.target.value)} required/></label>{user.role==="student"?<label>Curso<select value={courseId} onChange={e=>setCourseId(e.target.value)} required>{courses.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>:null}<button disabled={busy}>{busy?"Salvando...":"Salvar alterações"}</button>{profile?<p role="status">{profile}</p>:null}</form></section><PasswordBlock apiFetch={apiFetch}/><DeleteBlock apiFetch={apiFetch} onDone={()=>{logout();navigate("/",{replace:true});}}/></main>;
 }
+function PasswordBlock({apiFetch}:{apiFetch:typeof fetch}){const[current,setCurrent]=useState(""),[next,setNext]=useState(""),[confirmation,setConfirmation]=useState(""),[message,setMessage]=useState<string|null>(null),[busy,setBusy]=useState(false);const ref=useRef<AbortController|null>(null);useEffect(()=>()=>ref.current?.abort(),[]);async function submit(e:React.FormEvent){e.preventDefault();if(busy)return;if(next!==confirmation){setMessage("A confirmação da senha não confere.");return;}const c=new AbortController();ref.current=c;setBusy(true);try{const r=await apiFetch("/api/me/password",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({currentPassword:current,newPassword:next}),signal:c.signal});if(!r.ok)throw new Error();setCurrent("");setNext("");setConfirmation("");setMessage("Senha alterada.");}catch{if(!c.signal.aborted)setMessage("Não foi possível alterar a senha.");}finally{if(!c.signal.aborted)setBusy(false);}}return <section><h2>Alterar senha</h2><form className="auth-form" onSubmit={submit}><label>Senha atual<input type="password" value={current} onChange={e=>setCurrent(e.target.value)} required/></label><label>Nova senha<input type="password" value={next} onChange={e=>setNext(e.target.value)} required/></label><label>Confirme a nova senha<input type="password" value={confirmation} onChange={e=>setConfirmation(e.target.value)} required/></label><button disabled={busy}>{busy?"Salvando...":"Alterar senha"}</button>{message?<p role="status">{message}</p>:null}</form></section>}
+function DeleteBlock({apiFetch,onDone}:{apiFetch:typeof fetch;onDone:()=>void}){const[password,setPassword]=useState(""),[confirmation,setConfirmation]=useState(""),[confirmed,setConfirmed]=useState(false),[message,setMessage]=useState<string|null>(null),[busy,setBusy]=useState(false);async function submit(e:React.FormEvent){e.preventDefault();if(busy||!confirmed)return;setBusy(true);try{const r=await apiFetch("/api/me",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({password,confirmation})});if(!r.ok)throw new Error();onDone();}catch{setMessage("Não foi possível excluir a conta.");setBusy(false);}}return <section><h2>Excluir conta</h2><p>Esta ação é irreversível. Suas avaliações permanecerão anônimas.</p><form className="auth-form" onSubmit={submit}><label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required/></label><label>Digite DELETE<input value={confirmation} onChange={e=>setConfirmation(e.target.value)} required/></label><label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Entendo que a ação é irreversível.</label><button className="danger" disabled={busy||!confirmed}>{busy?"Excluindo...":"Excluir minha conta"}</button>{message?<p role="alert">{message}</p>:null}</form></section>}

@@ -1,6 +1,7 @@
 export type ProfessorFilters = {
   search: string;
   department: string;
+  page?: string;
 };
 
 function readSingleFilter(
@@ -18,6 +19,7 @@ export function readProfessorFilters(
   return {
     search: readSingleFilter(searchParams, "search"),
     department: readSingleFilter(searchParams, "department"),
+    page: readSingleFilter(searchParams, "page"),
   };
 }
 
@@ -35,6 +37,7 @@ export function createProfessorSearchParams(
   if (department !== "") {
     searchParams.set("department", department);
   }
+  if (filters.page && /^[1-9]\d*$/.test(filters.page) && filters.page !== "1") searchParams.set("page", filters.page);
 
   return searchParams;
 }

@@ -7,6 +7,7 @@ import {
   createProfessorSearchParams,
   readProfessorFilters,
 } from "../utils/professorFilters.js";
+import { Pagination } from "../components/Pagination.js";
 
 type LoadState = "loading" | "success" | "error";
 
@@ -24,11 +25,13 @@ export function ProfessorsListPage() {
   const canonicalSearchParams = createProfessorSearchParams({
     search: appliedSearch,
     department: appliedDepartment,
+    page: appliedFilters.page,
   }).toString();
   const [professors, setProfessors] = useState<ProfessorListItem[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [searchInput, setSearchInput] = useState("");
   const [departmentInput, setDepartmentInput] = useState("");
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 12, totalItems: 0, totalPages: 0 });
 
   useEffect(() => {
     setSearchInput(appliedSearch);
@@ -54,13 +57,15 @@ export function ProfessorsListPage() {
           throw new Error("Unable to load professors.");
         }
 
-        const data = (await response.json()) as ProfessorListItem[];
+        const payload = (await response.json()) as ProfessorListItem[] | { items: ProfessorListItem[]; pagination: typeof pagination };
+        const data = Array.isArray(payload) ? payload : payload.items;
 
         if (controller.signal.aborted) {
           return;
         }
 
         setProfessors(data);
+        if (!Array.isArray(payload)) setPagination(payload.pagination);
         setLoadState("success");
       } catch {
         if (!controller.signal.aborted) {
@@ -83,7 +88,7 @@ export function ProfessorsListPage() {
       search: searchInput.trim(),
       department: departmentInput.trim(),
     };
-    const nextSearchParams = createProfessorSearchParams(normalizedFilters);
+    const nextSearchParams = createProfessorSearchParams({ ...normalizedFilters, page: "1" });
     const nextCanonicalSearchParams = nextSearchParams.toString();
 
     setSearchInput(normalizedFilters.search);
@@ -102,6 +107,7 @@ export function ProfessorsListPage() {
       setSearchParams(new URLSearchParams());
     }
   }
+  function changePage(page: number) { const next = createProfessorSearchParams({ search: appliedSearch, department: appliedDepartment, page: String(page) }); if (next.toString() !== searchParams.toString()) setSearchParams(next); }
 
   if (loadState === "loading") {
     return <p className="state-message">Carregando...</p>;
@@ -123,6 +129,7 @@ export function ProfessorsListPage() {
           onClear={handleClearFilters}
         />
         <p className="state-message">Nenhum professor encontrado.</p>
+        <Pagination page={pagination.page} totalPages={pagination.totalPages} onPage={changePage} />
       </main>
     );
   }
@@ -181,6 +188,7 @@ export function ProfessorsListPage() {
           </li>
         ))}
       </ul>
+      <Pagination page={pagination.page} totalPages={pagination.totalPages} onPage={changePage} />
     </main>
   );
 }

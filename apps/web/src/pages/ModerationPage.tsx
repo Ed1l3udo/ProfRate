@@ -3,11 +3,13 @@ import { useState } from "react";
 import { ModerationReportsSection } from "./components/ModerationReportsSection.js";
 import { ModerationReviewsSection } from "./components/ModerationReviewsSection.js";
 import { ModerationUsersSection } from "./components/ModerationUsersSection.js";
+import { ModerationHistorySection } from "./components/ModerationHistorySection.js";
 
 const tabs = [
   ["reviews", "Avaliações pendentes"],
   ["reports", "Denúncias"],
   ["users", "Usuários"],
+  ["history", "Histórico"],
 ] as const;
 
 type Tab = (typeof tabs)[number][0];
@@ -22,5 +24,6 @@ export function ModerationPage() {
     <section id="reviews-panel" role="tabpanel" aria-labelledby="reviews-tab" hidden={activeTab !== "reviews"} className="moderation-section"><h2>Avaliações pendentes</h2><ModerationReviewsSection /></section>
     <section id="reports-panel" role="tabpanel" aria-labelledby="reports-tab" hidden={activeTab !== "reports"} className="moderation-section"><h2>Denúncias</h2><ModerationReportsSection /></section>
     <section id="users-panel" role="tabpanel" aria-labelledby="users-tab" hidden={activeTab !== "users"} className="moderation-section"><h2>Usuários</h2><ModerationUsersSection /></section>
+    <section id="history-panel" role="tabpanel" aria-labelledby="history-tab" hidden={activeTab !== "history"} className="moderation-section"><h2>Histórico</h2>{activeTab === "history" ? <ModerationHistorySection /> : null}</section>
   </main>;
 }

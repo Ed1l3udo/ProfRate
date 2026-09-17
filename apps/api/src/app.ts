@@ -3,6 +3,7 @@ import express, {
   type Request,
   type Response,
 } from "express";
+import { createHash, randomBytes } from "node:crypto";
 import {
   authenticatedUser,
   createAuthenticationMiddleware,
@@ -18,11 +19,20 @@ import {
   invalidCredentialsError,
   invalidLoginInputError,
   invalidProfileUpdateError,
+  forgotPasswordBodySchema,
+  resetPasswordBodySchema,
+  changePasswordBodySchema,
+  deleteAccountBodySchema,
+  invalidPasswordInputError,
+  invalidResetTokenError,
+  passwordMismatchError,
+  passwordUnchangedError,
   invalidSignupInputError,
   loginBodySchema,
   signupBodySchema,
   updateProfileBodySchema,
 } from "./modules/auth/schemas.js";
+import type { AuthSecurityRepository } from "./modules/auth/security-repository.js";
 import type { TokenService } from "./modules/auth/token.js";
 import type { CoursesRepository } from "./modules/courses/repository.js";
 import {
@@ -111,6 +121,7 @@ export function createApp({
   setReviewStatus = async () => undefined,
   listModerationUsers = async () => [],
   setBlocked = async () => undefined,
+  listModerationLogs = async () => [],
   adminRepository,
   discoveryRepository,
   findDisciplineById = async () => undefined,
@@ -130,6 +141,8 @@ export function createApp({
   verifyToken = async () => {
     throw new Error("Token service is not configured.");
   },
+  authSecurityRepository,
+  sendPasswordResetLink = async (link: string) => { if (process.env.NODE_ENV !== "test") console.log(`Password reset link generated: ${link}`); },
 }: {
   createReview: (
     input: Parameters<ReviewsRepository["createReview"]>[0],
@@ -159,6 +172,7 @@ export function createApp({
   setReviewStatus?: ModerationRepository["setReviewStatus"];
   listModerationUsers?: ModerationRepository["listUsers"];
   setBlocked?: ModerationRepository["setBlocked"];
+  listModerationLogs?: ModerationRepository["listLogs"];
   adminRepository?: AdminRepository;
   discoveryRepository?: DiscoveryRepository;
   findDisciplineById?: (id: number, viewerUserId?: number) => Promise<any>;
@@ -176,6 +190,8 @@ export function createApp({
   updateProfile?: UsersRepository["updateProfile"];
   verifyPassword?: PasswordService["verifyPassword"];
   verifyToken?: TokenService["verifyToken"];
+  authSecurityRepository?: AuthSecurityRepository;
+  sendPasswordResetLink?: (link: string) => Promise<void>;
 }) {
   const app = express();
   const {
@@ -228,6 +244,9 @@ export function createApp({
       return response.status(400).json({ error: invalidLoginInputError });
     }
 
+    if (authSecurityRepository !== undefined && await authSecurityRepository.isLoginLocked(parsedBody.data.email)) {
+      return response.status(429).json({ error: invalidCredentialsError });
+    }
     const user = await findUserByEmail(parsedBody.data.email);
     const passwordMatches = await verifyPassword(
       parsedBody.data.password,
@@ -235,15 +254,37 @@ export function createApp({
     );
 
     if (user === undefined || !passwordMatches) {
+      if (authSecurityRepository !== undefined) await authSecurityRepository.registerLoginFailure(parsedBody.data.email);
       return response.status(401).json({ error: invalidCredentialsError });
     }
 
     if (!user.active) {
       return response.status(403).json({ error: userBlockedError });
     }
+    if (authSecurityRepository !== undefined) await authSecurityRepository.clearLoginFailures(parsedBody.data.email);
 
     const token = await signToken({ userId: user.id, role: user.role });
     return response.status(200).json({ user: publicUser(user), token });
+  });
+
+  app.post("/auth/forgot-password", async (request, response) => {
+    const parsed = forgotPasswordBodySchema.safeParse(request.body);
+    if (parsed.success && authSecurityRepository !== undefined) {
+      const user = await findUserByEmail(parsed.data.email);
+      if (user !== undefined) {
+        const token = randomBytes(32).toString("base64url");
+        await authSecurityRepository.createResetToken(user.id, createHash("sha256").update(token).digest("hex"));
+        await sendPasswordResetLink(`/reset-password?token=${token}`);
+      }
+    }
+    return response.status(200).json({ message: "If the account exists, password reset instructions were generated." });
+  });
+
+  app.post("/auth/reset-password", async (request, response) => {
+    const parsed = resetPasswordBodySchema.safeParse(request.body);
+    if (!parsed.success || authSecurityRepository === undefined) return response.status(400).json({ error: invalidPasswordInputError });
+    const changed = await authSecurityRepository.consumeResetToken(createHash("sha256").update(parsed.data.token).digest("hex"), await hashPassword(parsed.data.newPassword));
+    return changed ? response.status(204).end() : response.status(400).json({ error: invalidResetTokenError });
   });
 
   app.get("/me", requireAuthentication, (_request, response) => {
@@ -265,7 +306,7 @@ export function createApp({
     const parsedBody = updateProfileBodySchema.safeParse(request.body);
     const user = authenticatedUser(response);
 
-    if (!parsedBody.success || (user.role === "moderator" && parsedBody.data.courseId !== undefined)) {
+    if (!parsedBody.success || (user.role !== "student" && parsedBody.data.courseId !== undefined)) {
       return response.status(400).json({ error: invalidProfileUpdateError });
     }
 
@@ -282,6 +323,25 @@ export function createApp({
     }
 
     return response.status(200).json(publicUser(updatedUser));
+  });
+
+  app.patch("/me/password", requireAuthentication, async (request, response) => {
+    const parsed = changePasswordBodySchema.safeParse(request.body);
+    if (!parsed.success || authSecurityRepository === undefined) return response.status(400).json({ error: invalidPasswordInputError });
+    const user = authenticatedUser(response);
+    if (!await verifyPassword(parsed.data.currentPassword, user.passwordHash)) return response.status(400).json({ error: passwordMismatchError });
+    if (await verifyPassword(parsed.data.newPassword, user.passwordHash)) return response.status(400).json({ error: passwordUnchangedError });
+    await authSecurityRepository.changePassword(user.id, await hashPassword(parsed.data.newPassword));
+    return response.status(204).end();
+  });
+
+  app.delete("/me", requireAuthentication, async (request, response) => {
+    const parsed = deleteAccountBodySchema.safeParse(request.body);
+    if (!parsed.success || authSecurityRepository === undefined) return response.status(400).json({ error: invalidPasswordInputError });
+    const user = authenticatedUser(response);
+    if (!await verifyPassword(parsed.data.password, user.passwordHash)) return response.status(400).json({ error: passwordMismatchError });
+    await authSecurityRepository.deleteAccount(user.id);
+    return response.status(204).end();
   });
 
   app.get(
@@ -320,9 +380,10 @@ export function createApp({
       return response.status(400).json({ error: invalidDisciplineFiltersError });
     }
 
-    const disciplines = await listDisciplines(parsedFilters.data);
-
-    return response.status(200).json(disciplines);
+    const { page, pageSize, ...filters } = parsedFilters.data;
+    const all = await listDisciplines(filters);
+    const totalItems = all.length;
+    return response.status(200).json({ items: all.slice((page - 1) * pageSize, page * pageSize), pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) } });
   });
 
   app.get("/disciplines/:id", optionalAuthentication, async (request, response) => {
@@ -498,9 +559,10 @@ export function createApp({
       });
     }
 
-    const professors = await listProfessors(parsedFilters.data);
-
-    return response.status(200).json(professors);
+    const { page, pageSize, ...filters } = parsedFilters.data;
+    const all = await listProfessors(filters);
+    const totalItems = all.length;
+    return response.status(200).json({ items: all.slice((page - 1) * pageSize, page * pageSize), pagination: { page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) } });
   });
 
   app.get("/professors/:id", optionalAuthentication, async (request, response) => {
@@ -744,7 +806,7 @@ export function createApp({
     const params = moderationIdParamsSchema.safeParse({ id: request.params.reviewId });
     const body = moderationReviewStatusSchema.safeParse(request.body);
     if (!params.success || !body.success) return response.status(400).json({ error: invalidModerationInputError });
-    const result = await setReviewStatus({ id: params.data.id, status: body.data.status });
+    const result = await setReviewStatus({ id: params.data.id, status: body.data.status, moderatorId: authenticatedUser(response).id });
     if (result === undefined) return response.status(404).json({ error: reviewNotFoundError });
     if (result === "conflict") return response.status(409).json({ error: moderationConflictError });
     return response.status(200).json(result);
@@ -754,6 +816,7 @@ export function createApp({
     if (!query.success) return response.status(400).json({ error: invalidModerationInputError });
     return response.status(200).json(await listReports(query.data.status));
   });
+  app.get("/moderation/logs", requireAuthentication, requireModerator, async (_request, response) => response.status(200).json(await listModerationLogs()));
   app.patch("/moderation/reports/:reportId", requireAuthentication, requireModerator, async (request, response) => {
     const params = moderationIdParamsSchema.safeParse({ id: request.params.reportId });
     const body = moderationReportStatusSchema.safeParse(request.body);
@@ -773,7 +836,7 @@ export function createApp({
       const params = moderationIdParamsSchema.safeParse({ id: request.params.userId });
       if (!params.success) return response.status(400).json({ error: invalidModerationInputError });
       if (blocked && params.data.id === authenticatedUser(response).id) return response.status(409).json({ error: selfBlockError });
-      const user = await setBlocked({ id: params.data.id, blocked });
+        const user = await setBlocked({ id: params.data.id, blocked, moderatorId: authenticatedUser(response).id });
       return user === undefined ? response.status(404).json({ error: moderationUserNotFoundError }) : response.status(200).json(user);
     });
   }

@@ -34,7 +34,7 @@ it("authorizes only admins and performs atomic catalog CRUD", async () => {
   expect(professor.status).toBe(201);
 
   const publicDisciplines = await request(server).get("/disciplines?search=adm101");
-  expect(publicDisciplines.body).toContainEqual(expect.objectContaining({ id: discipline.body.id, courses: [{ id: course.body.id, name: "Curso Administrativo" }] }));
+  expect(publicDisciplines.body.items).toContainEqual(expect.objectContaining({ id: discipline.body.id, courses: [{ id: course.body.id, name: "Curso Administrativo" }] }));
   const invalidUpdate = await request(server).patch(`/admin/disciplines/${discipline.body.id}`).set("Authorization", admin).send({ code: "ADM102", name: "Inválida", departmentId: department.body.id, workloadHours: 40, courseIds: [999] });
   expect(invalidUpdate.status).toBe(404);
   const unchanged = await request(server).get("/admin/disciplines").set("Authorization", admin);

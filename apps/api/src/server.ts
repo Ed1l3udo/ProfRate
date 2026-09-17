@@ -1,6 +1,7 @@
 import { createApp } from "./app.js";
 import { db } from "./db/client.js";
 import { createPasswordService } from "./modules/auth/password.js";
+import { createAuthSecurityRepository } from "./modules/auth/security-repository.js";
 import { createTokenService } from "./modules/auth/token.js";
 import { createCoursesRepository } from "./modules/courses/repository.js";
 import { createDepartmentsRepository } from "./modules/departments/repository.js";
@@ -31,6 +32,7 @@ const coursesRepository = createCoursesRepository(db);
 const disciplinesRepository = createDisciplinesRepository(db);
 const usersRepository = createUsersRepository(db);
 const passwordService = createPasswordService();
+const authSecurityRepository = createAuthSecurityRepository(db);
 const tokenService = createTokenService(authJwtSecret);
 const app = createApp({
   ...professorsRepository,
@@ -41,11 +43,13 @@ const app = createApp({
   discoveryRepository,
   listModerationReviews: moderationRepository.listReviews,
   listModerationUsers: moderationRepository.listUsers,
+  listModerationLogs: moderationRepository.listLogs,
   ...departmentsRepository,
   ...coursesRepository,
   ...disciplinesRepository,
   ...usersRepository,
   ...passwordService,
+  authSecurityRepository,
   ...tokenService,
 });
 

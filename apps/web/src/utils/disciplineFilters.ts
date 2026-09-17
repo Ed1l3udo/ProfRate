@@ -2,6 +2,7 @@ export type DisciplineFilters = {
   search: string;
   departmentId: string;
   courseId: string;
+  page?: string;
 };
 
 function readSingleFilter(searchParams: URLSearchParams, name: keyof DisciplineFilters) {
@@ -24,6 +25,7 @@ export function readDisciplineFilters(searchParams: URLSearchParams): Discipline
     search: readSingleFilter(searchParams, "search"),
     departmentId: positiveIntegerOrEmpty(readSingleFilter(searchParams, "departmentId")),
     courseId: positiveIntegerOrEmpty(readSingleFilter(searchParams, "courseId")),
+    page: positiveIntegerOrEmpty(readSingleFilter(searchParams, "page")),
   };
 }
 
@@ -36,6 +38,7 @@ export function createDisciplineSearchParams(filters: DisciplineFilters) {
   if (search !== "") searchParams.set("search", search);
   if (departmentId !== "") searchParams.set("departmentId", departmentId);
   if (courseId !== "") searchParams.set("courseId", courseId);
+  if (filters.page && filters.page !== "1") searchParams.set("page", positiveIntegerOrEmpty(filters.page));
 
   return searchParams;
 }

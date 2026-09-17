@@ -130,7 +130,7 @@ describe("academic catalog endpoints", () => {
     const response = await request(createApp({ ...currentDependencies, listDisciplines })).get(path);
 
     expect(response.status).toBe(200);
-    expect(response.body).toStrictEqual(disciplines);
+    expect(response.body.items).toStrictEqual(disciplines);
     expect(listDisciplines).toHaveBeenCalledWith(filters);
   });
 

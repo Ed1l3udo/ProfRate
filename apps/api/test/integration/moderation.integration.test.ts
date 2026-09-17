@@ -57,8 +57,9 @@ it("enforces the report contract and exposes report context only to moderators",
   const pending = await request(app)
     .post("/professors/1/reviews")
     .set("Authorization", studentOne)
-    .send({ ratings: professorRatings(2), comment: "Avaliação pendente para moderação." });
+    .send({ ratings: professorRatings(2), comment: "Avaliação zarg pendente para moderação." });
   expect(pending.status).toBe(201);
+  expect(pending.body.status).toBe("pending");
 
   const notPublished = await request(app)
     .post(`/reviews/${pending.body.id}/reports`)
@@ -67,16 +68,24 @@ it("enforces the report contract and exposes report context only to moderators",
   expect(notPublished.status).toBe(404);
   expect(notPublished.body.error.code).toBe("REVIEW_NOT_REPORTABLE");
 
-  const created = await request(app)
-    .post("/reviews/3/reports")
+  const published = await request(app)
+    .post("/professors/2/reviews")
     .set("Authorization", studentOne)
+    .send({ ratings: professorRatings(4), comment: "Avaliação limpa destinada a denúncia." });
+  expect(published.status).toBe(201);
+  expect(published.body.status).toBe("published");
+
+  const created = await request(app)
+    .post(`/reviews/${published.body.id}/reports`)
+    .set("Authorization", studentTwo)
     .send({ reason: "  Contexto fictício para análise.  " });
   expect(created.status).toBe(201);
   expect(created.body.reason).toBe("Contexto fictício para análise.");
+  expect(created.body.status).toBe("pending");
 
   const duplicate = await request(app)
-    .post("/reviews/3/reports")
-    .set("Authorization", studentOne)
+    .post(`/reviews/${published.body.id}/reports`)
+    .set("Authorization", studentTwo)
     .send({ reason: "Tentativa duplicada." });
   expect(duplicate.status).toBe(409);
   expect(duplicate.body.error.code).toBe("DUPLICATE_REPORT");
@@ -93,8 +102,8 @@ it("enforces the report contract and exposes report context only to moderators",
   expect(list.status).toBe(200);
   expect(list.body).toContainEqual(expect.objectContaining({
     id: created.body.id,
-    reporter: { id: 1, name: "Aluno Um", email: "aluno.um@profrate.test" },
-    review: expect.objectContaining({ id: 3, comment: "Terceira avaliação de teste." }),
+    reporter: { id: 2, name: "Aluno Dois", email: "aluno.dois@profrate.test" },
+    review: expect.objectContaining({ id: published.body.id, comment: "Avaliação limpa destinada a denúncia." }),
     professor: { id: 2, name: "Bruno Teste" },
     discipline: null,
   }));
@@ -131,7 +140,7 @@ it("moderates review visibility and blocks only content writes", async () => {
   const pending = await request(app)
     .post("/professors/1/reviews")
     .set("Authorization", studentOne)
-    .send({ ratings: professorRatings(4), comment: "Avaliação pronta para aprovação." });
+    .send({ ratings: professorRatings(4), comment: "Avaliação zarg pronta para aprovação." });
   expect(pending.status).toBe(201);
 
   const pendingList = await request(app)
@@ -156,7 +165,7 @@ it("moderates review visibility and blocks only content writes", async () => {
   const publicList = await request(app).get("/professors/1/reviews");
   expect(publicList.body).toContainEqual(expect.objectContaining({ id: pending.body.id, status: "published" }));
   const aggregate = await request(app).get("/professors");
-  expect(aggregate.body.find((professor: { id: number }) => professor.id === 1)).toMatchObject({ reviewCount: 3, averageRating: expect.any(Number) });
+  expect(aggregate.body.items.find((professor: { id: number }) => professor.id === 1)).toMatchObject({ reviewCount: 3, averageRating: expect.any(Number) });
 
   const removed = await request(app)
     .patch(`/moderation/reviews/${pending.body.id}`)

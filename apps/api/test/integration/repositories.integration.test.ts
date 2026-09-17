@@ -168,11 +168,11 @@ it("aggregates discipline reviews while preserving disciplines without reviews",
   });
 
   const result = await disciplinesRepository.listDisciplines();
-  expect(result[0]).toMatchObject({ reviewCount: 0, averageRating: null });
+  expect(result[0]).toMatchObject({ reviewCount: 2, averageRating: 4.5 });
   expect(result[1]).toMatchObject({ reviewCount: 0, averageRating: null });
   await expect(disciplinesRepository.findDisciplineById(1)).resolves.toMatchObject({
-    reviewCount: 0,
-    averageRating: null,
+    reviewCount: 2,
+    averageRating: 4.5,
   });
 });
 
@@ -392,8 +392,8 @@ it("recalculates review aggregates after create, update, and delete", async () =
   });
   const afterCreate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
 
-  expect(afterCreate.reviewCount).toBe(2);
-  expect(afterCreate.averageRating).toBe(4.5);
+  expect(afterCreate.reviewCount).toBe(3);
+  expect(afterCreate.averageRating).toBe(10 / 3);
 
   await reviewsRepository.updateReview({
     professorId: 1,
@@ -403,8 +403,8 @@ it("recalculates review aggregates after create, update, and delete", async () =
   });
   const afterUpdate = (await professorsRepository.listProfessors({ search: "Alice" }))[0];
 
-  expect(afterUpdate.reviewCount).toBe(2);
-  expect(afterUpdate.averageRating).toBe(4.5);
+  expect(afterUpdate.reviewCount).toBe(3);
+  expect(afterUpdate.averageRating).toBe(13 / 3);
 
   await reviewsRepository.deleteReview({ professorId: 1, reviewId: createdReview.id, authorId: 1 });
 
@@ -468,7 +468,7 @@ it("creates a review and returns the persisted columns", async () => {
     professorId: 3,
     rating: 2,
     ...professorReviewContract(2),
-    status: "pending",
+    status: "published",
     comment: "Avaliação criada no teste.",
     createdAt: expect.any(Date),
     updatedAt: expect.any(Date),
@@ -476,7 +476,9 @@ it("creates a review and returns the persisted columns", async () => {
   });
   expect(Number.isFinite(review.createdAt.getTime())).toBe(true);
   expect(review.updatedAt.getTime()).toBe(review.createdAt.getTime());
-  await expect(reviewsRepository.listReviewsByProfessorId(3, 1)).resolves.toStrictEqual([]);
+  await expect(reviewsRepository.listReviewsByProfessorId(3, 1)).resolves.toContainEqual(
+    expect.objectContaining({ id: review.id, status: "published" }),
+  );
 });
 
 it("persists exactly 500 comment code points through the repository", async () => {
@@ -528,7 +530,7 @@ it("partially updates a review", async () => {
     professorId: 1,
     rating: 2,
     ...professorReviewContract(2),
-    status: "pending",
+    status: "published",
     comment: "Primeira avaliação de teste.",
     createdAt: reviewFixtureTimestamp,
     updatedAt: expect.any(Date),

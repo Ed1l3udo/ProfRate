@@ -8,6 +8,7 @@ import type {
   ProfessorRatings,
   ProfessorReviewUpdate,
 } from "./schemas.js";
+import { isCommentFlagged } from "./content-filter.js";
 
 function reviewSelection() {
   return {
@@ -123,6 +124,7 @@ export function createReviewsRepository(db: Database) {
       authorId: input.authorId,
       ...input.ratings,
       comment: input.comment,
+      status: isCommentFlagged(input.comment ?? "") ? "pending" : "published",
     }).returning(reviewSelection());
 
     return publicReview(row!, true);
@@ -139,6 +141,7 @@ export function createReviewsRepository(db: Database) {
       authorId: input.authorId,
       ...input.ratings,
       comment: input.comment,
+      status: isCommentFlagged(input.comment ?? "") ? "pending" : "published",
     }).returning(reviewSelection());
 
     return publicReview(row!, true);
@@ -186,7 +189,7 @@ export function createReviewsRepository(db: Database) {
     const rows = await db.update(reviews).set({
       ...input.ratings,
       comment: input.comment,
-      status: "pending",
+      status: isCommentFlagged(input.comment ?? "") ? "pending" : "published",
       updatedAt: sql`now()`,
     }).where(and(
       eq(reviews.id, input.reviewId),
@@ -206,7 +209,7 @@ export function createReviewsRepository(db: Database) {
     const rows = await db.update(reviews).set({
       ...input.ratings,
       comment: input.comment,
-      status: "pending",
+      status: isCommentFlagged(input.comment ?? "") ? "pending" : "published",
       updatedAt: sql`now()`,
     }).where(and(
       eq(reviews.id, input.reviewId),
