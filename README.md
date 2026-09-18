@@ -1,216 +1,95 @@
 # ProfRate
 
-ProfRate é um projeto pessoal, educacional e de portfólio para estudar backend, banco de dados, APIs e testes automatizados por meio de uma aplicação local com professores e avaliações fictícios.
+Projeto pessoal, educacional e de portfólio para estudar APIs, banco de dados e testes. É uma demonstração **local**: professores, disciplinas, avaliações e contas são inteiramente fictícios. Não é serviço público e não tem vínculo, afiliação ou representação da UFC.
 
-## Objetivo de aprendizagem
+## O que demonstra
 
-O projeto exercita, em fatias pequenas, a integração entre persistência relacional, API HTTP, validação de entrada, frontend React e testes. Todos os nomes, departamentos, comentários e demais dados atuais são fictícios.
+Visitantes consultam catálogo, avaliações publicadas e rankings. Estudantes gerenciam conta, avaliações, favoritos e votos úteis. Moderadores analisam conteúdo, denúncias, usuários e logs; administradores mantêm o catálogo acadêmico.
 
-## Funcionalidades implementadas
-
-- listagem de professores fictícios;
-- detalhes de um professor;
-- catálogo fictício normalizado de departamentos, cursos e disciplinas;
-- listagem e detalhes de disciplinas com filtros persistidos na URL;
-- listagem de avaliações fictícias;
-- cadastro e login local de alunos com sessão JWT;
-- autoria, criação, edição e exclusão das próprias avaliações fictícias;
-- ciclo de publicação de avaliações, denúncias e moderação por uma conta fictícia dedicada;
-- papel administrativo local para manutenção segura do catálogo fictício;
-- painel `/admin` com CRUD de departamentos, cursos, disciplinas, professores e seus relacionamentos;
-- rankings públicos, favoritos pessoais e marcações de avaliações úteis;
-- área de conta e listagem das avaliações do aluno;
-- validação de parâmetros e corpos de requisição com respostas de erro previsíveis;
-- persistência em PostgreSQL por migrations e seed repetível;
-- interface web com estados de carregamento, sucesso, vazio e erro.
-
-O projeto não é uma plataforma pública e não recebe avaliações reais.
-
-## Estado atual
-
-A fatia vertical da P0 está concluída para demonstração local:
-
-```text
-React/Vite ↔ API Express ↔ Drizzle ORM ↔ PostgreSQL
+```mermaid
+flowchart LR
+  Web[React + Vite] -->|HTTP /api| API[Express]
+  API --> Repositories[Repositórios Drizzle]
+  Repositories --> DB[(PostgreSQL)]
 ```
 
-O projeto não possui serviço público. Ele não recebe avaliações reais, não utiliza dados de pessoas ou instituições reais e não deve ser apresentado como plataforma pública.
+Recursos: professores, departamentos, cursos e disciplinas; filtros, ordenação e paginação; avaliações estruturadas; autenticação e recuperação de senha; favoritos, rankings e votos úteis; denúncias, moderação e administração.
 
-## Origem, transparência e dados
+| Perfil | Acesso |
+| --- | --- |
+| Visitante | Catálogo, detalhes, avaliações publicadas e rankings |
+| Estudante | Avaliações próprias, favoritos, votos úteis e conta |
+| Moderador | Revisão, denúncias, usuários e histórico |
+| Administrador | Moderação e manutenção do catálogo |
 
-A ideia do projeto foi inspirada no **ProfRate**, um trabalho acadêmico originalmente desenvolvido em grupo. Esta é uma reimplementação pessoal, criada do zero, com histórico Git, decisões técnicas e código próprios. Nenhum código do projeto acadêmico original foi reutilizado.
+## Arquitetura
 
-O ProfRate não é afiliado, mantido nem representa a Universidade Federal do Ceará (UFC).
+Monorepo pnpm com `apps/web` (React, React Router e Vite) e `apps/api` (Express 5, Zod, Drizzle ORM e PostgreSQL 18). O Vite encaminha `/api` à API local. Migrations versionadas e seed repetível sustentam o ambiente.
 
-Os professores atuais — Ada Ribeiro, Caio Nogueira e Lina Vasconcelos — são fictícios. Todos os dados usados nas demonstrações locais devem permanecer fictícios.
+Segurança: validação Zod, senhas bcrypt, JWT HS256 com expiração e verificação do usuário atual, autorização por papel, bloqueio temporário de login e tokens de redefinição com hash e expiração.
 
-## Arquitetura atual
+## Executar localmente
 
-- **Banco:** PostgreSQL 18 no Docker Compose, com volume local persistente.
-- **Persistência:** Drizzle ORM, Drizzle Kit, schema TypeScript e migrations SQL versionadas.
-- **API:** Node.js 24, TypeScript e Express 5 em `apps/api`.
-- **Frontend:** React, React Router e Vite em `apps/web`.
-- **Validação:** Zod nas fronteiras de entrada da API.
-- **Integração local:** o proxy do Vite encaminha os caminhos `/api` para a API local, removendo esse prefixo.
-- **Testes:** Vitest e Supertest na API; Vitest e React Testing Library no frontend.
-
-## Pré-requisitos
-
-- Node.js 24
-- pnpm 11
-- Docker Desktop com Docker Compose
-
-## Execução local
-
-Instale as dependências:
+Pré-requisitos: Node.js 24, pnpm 11 e Docker Desktop.
 
 ```sh
 pnpm install --frozen-lockfile
 ```
 
-Crie a configuração local a partir do exemplo:
-
-```powershell
-# PowerShell
-Copy-Item .env.example .env
-```
-
-```sh
-# macOS/Linux
-cp .env.example .env
-```
-
-Defina em `.env` uma senha local para `POSTGRES_PASSWORD`, use a mesma senha em `DATABASE_URL` e substitua `AUTH_JWT_SECRET` por um segredo local com ao menos 32 caracteres. O servidor não inicia sem essa variável.
-
-Inicie o PostgreSQL:
+Copie `.env.example` para `.env`, defina uma senha local para `POSTGRES_PASSWORD`, use-a em `DATABASE_URL` e substitua `AUTH_JWT_SECRET` por um segredo local de ao menos 32 caracteres.
 
 ```sh
 docker compose up -d
-docker compose ps
-```
-
-Antes de continuar, aguarde o serviço `postgres` aparecer como saudável (`healthy`) em `docker compose ps`. Só então aplique a migration e o seed:
-
-```sh
 pnpm --filter @profrate/api db:migrate
 pnpm --filter @profrate/api db:seed
 pnpm --filter @profrate/api db:check
 ```
 
-Mantenha estes dois processos ativos em terminais separados:
+Em dois terminais:
 
 ```sh
-# Terminal da API
 pnpm --filter @profrate/api dev
-```
-
-```sh
-# Terminal do frontend
 pnpm --filter @profrate/web dev
 ```
 
-Abra a interface em [http://localhost:5173](http://localhost:5173). A API fica disponível em `http://localhost:3000`.
+Abra `http://localhost:5173`. Para encerrar o banco preservando dados: `docker compose down` (sem `-v`).
 
-Para encerrar o banco local, execute:
+### Contas fictícias
 
-```sh
-docker compose down
-```
-
-Esse comando preserva o volume do PostgreSQL e seus dados. Não use `docker compose down -v` para a rotina normal, pois ele remove volumes.
-
-## Banco de dados
-
-- `db:migrate` aplica as migrations SQL geradas pelo Drizzle.
-- `db:seed` insere o catálogo fictício com 3 departamentos, 3 cursos, 10 professores, 15 disciplinas, três avaliações de professor e três avaliações de disciplina já publicadas, uma avaliação pendente e uma denúncia pendente, sem duplicar os dados controlados nem trocar hashes quando executado novamente.
-- `db:check` executa uma consulta simples para confirmar a conexão e fecha o Pool ao terminar.
-- `db:generate` gera uma nova migration depois de uma alteração aprovada no schema Drizzle.
-
-O seed também cria três contas exclusivamente locais e fictícias, sem substituir senhas caso elas já existam:
-
-| Perfil | E-mail | Senha demonstrativa |
+| Perfil | E-mail | Senha |
 | --- | --- | --- |
-| Aluno | `ana@student.profrate.test` | `ProfRate#2026Aluno` |
+| Estudante | `ana@student.profrate.test` | `ProfRate#2026Aluno` |
 | Moderador | `moderador@profrate.test` | `ProfRate#2026Moderador` |
 | Administrador | `admin@profrate.test` | `ProfRate#2026Admin` |
 
-Essas credenciais são dados de demonstração, não devem ser reutilizadas fora deste ambiente e não representam pessoas reais. O banco armazena apenas hashes bcrypt das senhas.
+## Qualidade
 
 ```sh
-pnpm --filter @profrate/api db:generate
+pnpm check
+pnpm test:integration
 ```
 
-## API
+`pnpm check` reúne typecheck, testes e build. A CI executa essa verificação e testes PostgreSQL de integração separadamente.
 
-| Método | Caminho | Resposta |
-| --- | --- | --- |
-| GET | `/health` | `{ "status": "ok" }` |
-| POST | `/auth/signup` | Cria uma conta `student` e retorna usuário público e token |
-| POST | `/auth/login` | Autentica por e-mail e senha e retorna usuário público e token |
-| GET | `/me` | Retorna o usuário autenticado |
-| PATCH | `/me` | Atualiza nome e, para aluno, curso |
-| GET | `/me/reviews` | Lista as avaliações do aluno autenticado com o alvo resumido |
-| GET | `/professors` | Lista de professores fictícios com `id` e `name` |
-| GET | `/professors/:id` | Professor com `id`, `name` e `department` |
-| GET | `/professors/:id/reviews` | Lista as avaliações estruturadas do professor |
-| POST | `/professors/:id/reviews` | Aluno autenticado cria uma avaliação e recebe `201` |
-| PATCH | `/professors/:professorId/reviews/:reviewId` | Autor autenticado atualiza sua avaliação |
-| DELETE | `/professors/:professorId/reviews/:reviewId` | Autor autenticado exclui sua avaliação e recebe `204` |
-| GET | `/departments` | Lista os departamentos fictícios |
-| GET | `/courses` | Lista os cursos; aceita `departmentId` |
-| GET | `/disciplines` | Lista disciplinas; aceita `search`, `departmentId` e `courseId` |
-| GET | `/disciplines/:id` | Detalha a disciplina, seus cursos e professores relacionados |
-| GET | `/disciplines/:id/reviews` | Lista as avaliações estruturadas da disciplina |
-| POST | `/disciplines/:id/reviews` | Aluno autenticado cria uma avaliação e recebe `201` |
-| PATCH | `/disciplines/:disciplineId/reviews/:reviewId` | Autor autenticado atualiza sua avaliação |
-| DELETE | `/disciplines/:disciplineId/reviews/:reviewId` | Autor autenticado exclui sua avaliação e recebe `204` |
-| POST | `/reviews/:reviewId/reports` | Aluno autenticado e desbloqueado denuncia uma avaliação publicada de outra pessoa |
-| GET | `/moderation/reviews` | Moderador lista avaliações por status (padrão: `pending`) |
-| PATCH | `/moderation/reviews/:reviewId` | Moderador publica ou remove uma avaliação |
-| GET | `/moderation/reports` | Moderador lista denúncias por status (padrão: `pending`) com contexto da avaliação |
-| PATCH | `/moderation/reports/:reportId` | Moderador resolve ou descarta uma denúncia |
-| GET | `/moderation/users` | Moderador busca usuários por nome ou e-mail |
-| PATCH | `/moderation/users/:userId/block` | Moderador bloqueia um usuário, exceto a própria conta |
-| PATCH | `/moderation/users/:userId/unblock` | Moderador desbloqueia um usuário |
-| GET, POST | `/admin/departments` | Admin lista ou cria departamentos |
-| PATCH, DELETE | `/admin/departments/:departmentId` | Admin edita ou exclui departamento sem referências |
-| GET, POST | `/admin/courses` | Admin lista ou cria cursos |
-| PATCH, DELETE | `/admin/courses/:courseId` | Admin edita ou exclui curso sem referências |
-| GET, POST | `/admin/disciplines` | Admin lista ou cria disciplinas e cursos relacionados |
-| PATCH, DELETE | `/admin/disciplines/:disciplineId` | Admin edita ou exclui disciplina sem referências |
-| GET, POST | `/admin/professors` | Admin lista ou cria professores e disciplinas relacionadas |
-| PATCH, DELETE | `/admin/professors/:professorId` | Admin edita ou exclui professor sem referências |
-| GET | `/rankings/professors`, `/rankings/disciplines` | Rankings públicos por avaliações publicadas |
-| GET | `/me/favorites` | Favoritos separados do usuário autenticado |
-| PUT, DELETE | `/me/favorites/professors/:id` | Adiciona ou remove favorito de professor de modo idempotente |
-| PUT, DELETE | `/me/favorites/disciplines/:id` | Adiciona ou remove favorito de disciplina de modo idempotente |
-| PUT, DELETE | `/reviews/:id/helpful` | Marca ou remove uma marcação útil em review publicada |
+## Galeria
 
-As rotas públicas de catálogo continuam sem exigir sessão e só exibem avaliações `published`; pendentes e removidas não influenciam médias nem contagens. Escritas de avaliações e denúncias usam `Authorization: Bearer <token>`, aceitam um objeto `ratings` completo — quatro critérios para professor ou três para disciplina — e `comment` ou motivo não vazio. A média decimal `rating` é derivada pelo PostgreSQL e não é aceita no corpo da requisição; o autor vem exclusivamente do token. Usuários bloqueados continuam lendo os dados, mas não podem criar, editar, excluir ou denunciar avaliações. A leitura pública informa `canManage`, mas nunca expõe `authorId`, hash de senha ou token. Tokens HS256 carregam somente `userId` e `role` e expiram em sete dias.
+| ![Listagem de professores do catálogo fictício](docs/images/professors.png) | ![Detalhe de disciplina com avaliações](docs/images/discipline-details.png) |
+| --- | --- |
+| Professores | Detalhe da disciplina |
+| ![Ranking de professores](docs/images/rankings.png) | ![Favoritos do estudante](docs/images/favorites.png) |
+| Rankings | Favoritos |
+| ![Avaliações enviadas pelo estudante](docs/images/student-reviews.png) | ![Avaliações pendentes na moderação](docs/images/moderation-1.png) |
+| Minhas avaliações | Moderação: pendências |
+| ![Denúncias e usuários na moderação](docs/images/moderation-2.png) | ![Gestão administrativa do catálogo](docs/images/administration.png) |
+| Moderação: denúncias e usuários | Administração |
 
-Senhas são validadas na borda, armazenadas com bcrypt (custo 12) e nunca registradas ou devolvidas. O JWT é criado e verificado pelo `jose`; a API valida assinatura, expiração, formato do payload, existência, estado e papel atual do usuário antes de autorizar uma operação. O cadastro público cria somente alunos. Administradores também podem acessar a moderação, mas apenas administradores acessam `/admin`.
+## Documentos
 
-Os corpos administrativos são objetos estritos: nomes são normalizados, IDs são inteiros positivos, relações não aceitam IDs repetidos e referências devem existir. As alterações de relações são transacionais. Exclusões retornam `409` quando o catálogo ou avaliações ainda dependem do recurso, em vez de remover conteúdo relacionado em cascata.
+- [Arquitetura](docs/architecture.md)
+- [Roteiro de demonstração](docs/demo.md)
+- [Visão](docs/vision.md), [escopo](docs/scope.md) e [roadmap](docs/roadmap.md)
+- [ADR 0001](docs/decisions/0001-stack-inicial.md)
 
-## Verificações
+## Limitações
 
-```sh
-pnpm --filter @profrate/api typecheck
-pnpm --filter @profrate/api test
-pnpm --filter @profrate/api build
-pnpm --filter @profrate/web typecheck
-pnpm --filter @profrate/web test
-pnpm --filter @profrate/web build
-```
-
-## Documentação
-
-- [Visão do produto](docs/vision.md)
-- [Escopo](docs/scope.md)
-- [Roadmap](docs/roadmap.md)
-- [ADR 0001 — Stack inicial](docs/decisions/0001-stack-inicial.md)
-- [Orientações para agentes de desenvolvimento](AGENTS.md)
-
-## Licença
-
-A licença do projeto ainda será definida.
+O projeto é uma demonstração local com dados fictícios, sem operação pública. Não há licença definida para este repositório.
